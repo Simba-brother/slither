@@ -592,7 +592,7 @@ def parse_expression(expression, caller_context):
             member_type = expression['typeDescriptions']['typeString']
             member_expression = parse_expression(expression['expression'], caller_context)
         else:
-            member_name = expression['attributes']['member_name']
+            member_name = expression['attributes']['member_name']  # 提取msg.sender.transfer()中的transfer
             member_type = expression['attributes']['type']
             children = expression['children']
             assert len(children) == 1

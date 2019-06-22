@@ -32,7 +32,8 @@ def _edge(from_node, to_node):
     return f'"{from_node}" -> "{to_node}"'
 
 # return dot language string to add graph node (with optional label)
-def _node(node, label=None):
+
+def _node(node, label=None):  # node也是一个串， label = function.name
     return ' '.join((
         f'"{node}"',
         f'[label="{label}"]' if label is not None else '',
@@ -44,10 +45,10 @@ class PrinterCallGraph(AbstractPrinter):
 
     WIKI = 'https://github.com/trailofbits/slither/wiki/Printer-documentation#call-graph'
 
-    def _process_functions(self, functions):
+    def _process_functions(self, functions):    # functions = self.slither.functions
 
-        contract_functions = defaultdict(set) # contract -> contract functions nodes
-        contract_calls = defaultdict(set) # contract -> contract calls edges
+        contract_functions = defaultdict(set)  # contract -> contract functions nodes
+        contract_calls = defaultdict(set)  # contract -> contract calls edges
 
         solidity_functions = set() # solidity function nodes
         solidity_calls = set() # solidity calls edges
@@ -56,16 +57,17 @@ class PrinterCallGraph(AbstractPrinter):
         all_contracts = set()
 
         for function in functions:
-            all_contracts.add(function.contract)
+            all_contracts.add(function.contract)    # 存储所有的合约到一个set
+
         for function in functions:
-            self._process_function(function.contract,
-                                   function,
-                                   contract_functions,
-                                   contract_calls,
-                                   solidity_functions,
-                                   solidity_calls,
-                                   external_calls,
-                                   all_contracts)
+            self._process_function(function.contract,   # 这个函数所对应的合约
+                                   function,            # 待处理的这个函数
+                                   contract_functions,  # 这个合约的所有函数
+                                   contract_calls,      # 这个合约所有call
+                                   solidity_functions,  # 这个合约solidity function nodes
+                                   solidity_calls,      # 这个合约solidity calls edges
+                                   external_calls,      # 这个合约external calls edges
+                                   all_contracts)       # 这个文件里面所有的合约
 
         render_internal_calls = ''
         for contract in all_contracts:
@@ -79,7 +81,7 @@ class PrinterCallGraph(AbstractPrinter):
 
     def _process_function(self, contract, function, contract_functions, contract_calls, solidity_functions, solidity_calls, external_calls, all_contracts):
         contract_functions[contract].add(
-            _node(_function_node(contract, function), function.name),
+            _node(_function_node(contract, function), function.name),  # 这里用funciton.name无法实现重载带来的需求
         )
 
         for internal_call in function.internal_calls:

@@ -32,10 +32,10 @@ logger = logging.getLogger("Node")
 
 class NodeType:
 
-    ENTRYPOINT = 0x0  # no expression
+    # no expression
+    ENTRYPOINT = 0x0
 
     # Node with expression
-
     EXPRESSION = 0x10  # normal case
     RETURN = 0x11      # RETURN may contain an expression
     IF = 0x12
