@@ -52,9 +52,9 @@ class SpcificReen(AbstractDetector):
     def detect_reentrancy(self, contract):
         for function in contract.functions_and_modifiers_declared:
             if function.is_implemented:
-                print(function.high_level_calls)
-                print(function.internal_calls)
-                # if self.KEY in function.context:
+                #
+                # if self.KEY in function.context:print(function.high_level_calls)
+                # print(function.internal_calls)
                 #     continue
                 # self._explore(function.entry_point, [])
                 # function.context[self.KEY] = True
@@ -70,6 +70,7 @@ class SpcificReen(AbstractDetector):
                         function_canEth = True
                         # print("可以传送eth")
                         eth_nodes.append(node)
+                        '''
                         if node.low_level_calls:            # 如果是LowLevelCall发送eth
                             lowlevelCall_eth_Nodes.append(node)
                             pass
@@ -78,7 +79,7 @@ class SpcificReen(AbstractDetector):
                                 if isinstance(ir, (Transfer, Send)):    # 如果是transfer or send发送eth
                                     transferORsendNodes.append(node)
                                     pass
-
+                        '''
                     # for ir in node.irs:
                         # if isinstance(ir, Transfer):
                         #     transferORsendNodes.append(node)
@@ -94,20 +95,19 @@ class SpcificReen(AbstractDetector):
                 #
 
                 for eth_node in eth_nodes:
-                    after_ethNodeList.append(eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
+                    # after_ethNodeList.append(eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
                     self._getAllbehindNode(eth_node, after_ethNodeList)
+
                 for afterEthNode in after_ethNodeList:
                     result = self._analyzerCallLink(afterEthNode)  # False代表没有检测到reen
                     if result == True:
                         result_for_selfFunction = result
-                        break
+                        break           # 如果只从本身分析就得到了reen结果
                     else:
                         continue
                 if result_for_selfFunction == True:
                     print('还没回溯就已经找到reentrancy')
-                test_fatherFunctionList = self.getfatherFunctions(function)
-                for fatherFunction in test_fatherFunctionList:
-                    print(fatherFunction.full_name)
+
                 if not result_for_selfFunction and function_canEth:  # 如果说本函数分析后发现不是reentrancy那么就回找本函数的fatherfunciton
                     fatherFunctionList, result = self.backTrackParse(function)
                     for fatherFunction in fatherFunctionList:
@@ -186,6 +186,7 @@ class SpcificReen(AbstractDetector):
         return False
 
     def _externalCallLinkparse(self, node):
+        externalCallLink_parse_Result = 0
         """
         :param node: 含有外部调用的node（跨合约）
         :return: 如果确实是脏数据则返回1
@@ -194,6 +195,8 @@ class SpcificReen(AbstractDetector):
             若确定为脏数据，打印‘reentrance’并返回1
             否则， 进入这个干净外部函数内得到他的所有node,再次分析调用链self._analyzerCallLink(calledExternalFunctionNode)
         """
+        print("进入外部调用链分析")
+        print('开始分析的节点是', node.type)
         taintflag = False
         if node.high_level_calls or node.low_level_calls:
             if node.low_level_calls:   # 这块仅仅是模拟没有任何参考价值
@@ -201,16 +204,28 @@ class SpcificReen(AbstractDetector):
             print('进行脏数据分析...')
             if taintflag:   # 如果数据脏则打印Reentrance
                 print('脏')
-                return 1
+                externalCallLink_parse_Result = 1
+                return externalCallLink_parse_Result
+
             else:   # 如果数据干净，跳入external call的Function.
-                for external_calls in node.high_level_calls + node.low_level_calls:
-                    for external_call in external_calls:
-                        calledExternalFunction = external_call
+                print('不脏')
+                high_level_calls = []
+                for high_level_calls_tuple in node.high_level_calls:
+                    high_level_calls.append(high_level_calls_tuple[1])
+                # for external_calls in high_level_calls:  # node.low_level_calls暂不考虑，因为根据node.low_level_call目前还跳不进去这个called外部调用函数
+                    for external_call in high_level_calls:
+                        calledExternalFunction = external_call  # 得到called外部调用函数对象实例
+                        print('准备跳转到外部调用函数中：', calledExternalFunction.full_name)
                         calledExternalFunctionNodeList = self._getAllNodes(calledExternalFunction)
                         for calledExternalFunctionNode in calledExternalFunctionNodeList:
-                            self._analyzerCallLink(calledExternalFunctionNode)
-        return 0
+                            externalCallLink_parse_Result = self._analyzerCallLink(calledExternalFunctionNode)  # 针对具体例子写的注释： 这个节点应该是个lowlevelcall
+                            if externalCallLink_parse_Result == 1:
+                                return externalCallLink_parse_Result
+
+        return externalCallLink_parse_Result
+
     def _internalCallLinkparse(self, node):
+        internalCallLinkparse_Result = 0
         '''
         :param node: 含有内部调用的node（跨函数）
         :return:
@@ -226,11 +241,13 @@ class SpcificReen(AbstractDetector):
                     if calledInternalFuntionNode.high_level_calls or calledInternalFuntionNode.low_level_calls:  # 如果找到含有外部调用节点
                         result = self._externalCallLinkparse(calledInternalFuntionNode)
                         if result == 1:
-                            return 1
+                            internalCallLinkparse_Result = 1
+                            return internalCallLinkparse_Result
                     else:
                         if calledInternalFuntionNode.internal_calls:
                             self._internalCallLinkparse(calledInternalFuntionNode)
-        return 0
+
+        return internalCallLinkparse_Result
     def _getAllNodes(self, function):
         return function.nodes
 
