@@ -60,9 +60,10 @@ class SpcificReen(AbstractDetector):
                 # function.context[self.KEY] = True
                 lowlevelCall_eth_Nodes = []  # 用于存储每一个函数中可以传送eth的lowlevelCall节点
                 transferORsendNodes = []    # 用于存储每一个函数中transfer和node节点
+                fatherFunctionLayerCount = 0
                 eth_nodes = []
                 function_canEth = False
-                result_for_selfFunction = False  # False代表没有检测到reen
+                isReentrancy = False  # False代表没有检测到reen
                 after_ethNodeList = []
                 nodes = self._getAllNodes(function)  # 得到函数中所有的节点
                 for node in nodes:
@@ -101,22 +102,43 @@ class SpcificReen(AbstractDetector):
                 for afterEthNode in after_ethNodeList:
                     result = self._analyzerCallLink(afterEthNode)  # False代表没有检测到reen
                     if result == True:
-                        result_for_selfFunction = result
+                        isReentrancy = result
                         break           # 如果只从本身分析就得到了reen结果
                     else:
                         continue
-                if result_for_selfFunction == True:
+                if isReentrancy == True:
                     print('还没回溯就已经找到reentrancy')
-
-                if not result_for_selfFunction and function_canEth:  # 如果说本函数分析后发现不是reentrancy那么就回找本函数的fatherfunciton
+                    continue
+                if not isReentrancy and function_canEth:  # 如果说本函数分析后发现不是reentrancy那么就回找本函数的fatherfunciton
+                    print(function.full_name, '只有eth,本身函数体内没reetrance')
+                    isReentrancy, suspiciouPathLength = self.recursion_backTrack(function, fatherFunctionLayerCount)
+                    if isReentrancy == True:
+                        print('Reentrance in {}.{} 可疑路径长度 = {}'.format(function.contract.name, function.full_name, suspiciouPathLength))
+                    else:
+                        print('No Reentrance in {}.{}'.format(function.contract.name, function.full_name))
+                    '''
                     fatherFunctionList, result = self.backTrackParse(function)
+
                     for fatherFunction in fatherFunctionList:
                         print(fatherFunction.full_name)
                     if result == False: #上一层的回溯检测为安全,那么进行下一轮的回溯检测
+                        pass
                         for fatherFunction in fatherFunctionList:
-                            self.backTrackParse(fatherFunction)
+                            print('开始从fatherFunction往回追比如', fatherFunction)
+                            fatherFunctionList, result_for_fatherFunction = self.backTrackParse(fatherFunction)
+                            if fatherFunctionList == []:
+                                continue
+                            else:
+                                
+
+                        # for fatherFunction in fatherFunctionList:
+                        #     self.backTrackParse(fatherFunction)
                     else:
                         print("通过回溯，此时已经找到了一条组合reentrancy路径")
+                        
+                    '''
+
+
                     '''fatherFunctionList = self.getfatherFunctions(function)  # 得到了所有的fatherfunction
                     node_calling_ethFunctionWithoutReen = []    # 用于存储那些node(node调用了一个ethFuncion但是没有reen)
                     for fatherFunction in fatherFunctionList:
@@ -139,12 +161,42 @@ class SpcificReen(AbstractDetector):
                     #                 print('进行脏数据分析')
                     #             elif:   # 如果没找到，找calledFunction中所有的interal call
                     #                 if calledInternalFuntionNode.internal_calls:
-
+    def recursion_backTrack(self, function, fatherFunctionLayerCount):
+        fatherFunctionList, result = self.backTrackParse(function)
+        if result == False:  # 上一层的回溯检测为安全,那么准备进行下一层fatherFunction的回溯检测
+            if fatherFunctionList:  # 如果存在下一轮fatherFunction
+                fatherFunctionLayerCount += 1
+                for fatherFunction in fatherFunctionList:
+                    print('追到了第 {} 层的爸爸函数：{}'.format(fatherFunctionLayerCount, fatherFunction.full_name))
+                    res, length = self.recursion_backTrack(fatherFunction, fatherFunctionLayerCount)   # 测试注释 teshhh
+                    return res, length
+            else:
+                print("回溯后发现依然安全")
+                # return False, 0
+                return False, fatherFunctionLayerCount
+        else:
+            fatherFunctionLayerCount += 1
+            print("通过回溯，此时已经找到了一条组合reentrancy路径")
+            return True, fatherFunctionLayerCount
+        # if result == True:
+        #     print("通过回溯，此时已经找到了一条组合reentrancy路径")
+        #     return True, fatherFunctionLayerCount
+        # else:
+        #     if fatherFunctionList:  # 如果存在下一轮fatherFunction
+        #         fatherFunctionLayerCount += 1
+        #         for fatherFunction in fatherFunctionList:
+        #             print('追到了第 {} 层的爸爸函数：{}'.format(fatherFunctionLayerCount, fatherFunction.full_name))
+        #             self.recursion_backTrack(fatherFunction, fatherFunctionLayerCount)
+        #     else:
+        #         print("回溯后发现依然安全")
+        #         return False, 0
     def backTrackParse(self, function):
         result_for_fatherFunction = False
-        fatherFunctionList = self.getfatherFunctions(function)
-        node_calling_ethFunctionWithoutReen = []    # 用于存储那些node(node调用了一个ethFuncion但是没有reen)
+        fatherFunctionList = self.getfatherFunctions(function)  #得到testhhh的爸爸，也就是zhongji
+        node_calling_ethFunctionWithoutReen = []    # 用于存储那些node(node调用了一个ethFuncion(但是没有reen))
+
         for fatherFunction in fatherFunctionList:  # 第一层fatherFunction
+            #print(fatherFunction.full_name)
             high_level_calls = []
             nodes = self._getAllNodes(fatherFunction)   # 得到fatherFunction得所有节点
             for node in nodes:
@@ -169,6 +221,12 @@ class SpcificReen(AbstractDetector):
             # 注意这里没有append因为进入这里的已经是fatherFunction了，不能再进入sonFuncion
             self._getAllbehindNode(eth_node, after_ethNodeList)
         return after_ethNodeList
+
+    def _getAllbehindNode(self, node, afterNodeList):
+        sons = node.sons
+        afterNodeList.extend(sons)
+        for son in sons:
+            self._getAllbehindNode(son, afterNodeList)
 
     def _analyzerCallLink(self, node):
         """
@@ -251,24 +309,30 @@ class SpcificReen(AbstractDetector):
     def _getAllNodes(self, function):
         return function.nodes
 
-    def _getAllbehindNode(self, node, afterNodeList):
-        sons = node.sons
-        afterNodeList.extend(sons)
-        for son in sons:
-            self._getAllbehindNode(son, afterNodeList)
+
 
     def getfatherFunctions(self, currentFunction):
         fatherFunctions = []
-        high_level_calls = []
         for contract in self.contracts:
             for function in contract.functions_and_modifiers_declared:
+                high_level_calls = []
+                print('现在遍历到的函数是: {function_name}'.format(function_name=function.full_name))
+                print('外部调用：', function.high_level_calls)
+                print('内部调用：', function.internal_calls)
                 for high_level_call_tuple in function.high_level_calls:  # 因为function.high_level_calls返回值为这样的存储形式[(contract, funtion), (contract, function), ...].故需要提取出function
                     high_level_calls.append(high_level_call_tuple[1])
-                if currentFunction in function.internal_calls + high_level_calls:  # 暂时不考虑function.low_level_calls
+                if currentFunction in list(set(function.internal_calls + high_level_calls)):  # 暂时不考虑function.low_level_calls
                     fatherFunctions.append(function)
+                    print('将{}添加到爸爸中'.format(function.full_name))
+                # for function in function.internal_calls + high_level_calls:
+                #     if (currentFunction._contract.name == function._contract.name and currentFunction.full_name == function.full_name):
+                #         fatherFunctions.append(function)
+        print('----------fatherFunction层分割线--------  爸爸们的个数{}'.format(len(fatherFunctions)))
+        for fatherFunction in fatherFunctions:  # 第一层fatherFunction
+            print(fatherFunction.full_name)
         return fatherFunctions
 
-    def _can_send_eth(self,irs):
+    def _can_send_eth(self, irs):
         """
             Detect if the node can send eth
         """
