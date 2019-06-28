@@ -52,19 +52,22 @@ class SpcificReen(AbstractDetector):
     def detect_reentrancy(self, contract):
         for function in contract.functions_and_modifiers_declared:
             if function.is_implemented:
-                #
-                # if self.KEY in function.context:print(function.high_level_calls)
-                # print(function.internal_calls)
-                #     continue
-                # self._explore(function.entry_point, [])
-                # function.context[self.KEY] = True
+                '''
+                if self.KEY in function.context:print(function.high_level_calls)
+                print(function.internal_calls)
+                    continue
+                self._explore(function.entry_point, [])
+                function.context[self.KEY] = True
+                '''
                 lowlevelCall_eth_Nodes = []  # 用于存储每一个函数中可以传送eth的lowlevelCall节点
                 transferORsendNodes = []    # 用于存储每一个函数中transfer和node节点
-                fatherFunctionLayerCount = 0
-                eth_nodes = []
-                function_canEth = False
-                isReentrancy = False  # False代表没有检测到reen
-                after_ethNodeList = []
+                fatherFunctionLayerCount = 0  # 回溯调用记录的层数
+                eth_nodes = []  # 存储本函数含有转帐功能的钱数
+                function_canEth = False  # flag, 用于标记本函数是否含有直接的转钱功能
+                isReentrancy = False  # False代表没有检测到reentrance
+                after_ethNodeList = []  # 用于存储转账节点的所有后续节点
+
+                # 往 eth_nodes列表中append值
                 nodes = self._getAllNodes(function)  # 得到函数中所有的节点
                 for node in nodes:
                     if self._can_send_eth(node.irs):    # 如果这个节点可以发送eth
@@ -95,23 +98,26 @@ class SpcificReen(AbstractDetector):
                 #     self._analyzerCallLink(afterNode)
                 #
 
+                # 得到每一个eth_node的后续节点并进行存储到after_ethNodeList列表中
                 for eth_node in eth_nodes:
-                    # after_ethNodeList.append(eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
+                    after_ethNodeList.append(eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
                     self._getAllbehindNode(eth_node, after_ethNodeList)
 
+                # 从after_ethNodeList列表中取出所有的节点（记为afterEthNode）, 然后进行调用链的分析
                 for afterEthNode in after_ethNodeList:
-                    result = self._analyzerCallLink(afterEthNode)  # False代表没有检测到reen
+                    result = self._analyzerCallLink(afterEthNode)  # False代表没有检测到reentrance
                     if result == True:
                         isReentrancy = result
-                        break           # 如果只从本身分析就得到了reen结果
+                        break           # 如果只从本身分析就得到了reentrance结果, 就不用遍历后续节点了。
                     else:
                         continue
-                if isReentrancy == True:
+                if isReentrancy == True:   # 到这里这个函数的所有afterEthNode就遍历分析完了，如果为True。输出reentrance,然后分析下一个函数
                     print('还没回溯就已经找到reentrancy')
-                    continue
-                if not isReentrancy and function_canEth:  # 如果说本函数分析后发现不是reentrancy那么就回找本函数的fatherfunciton
-                    print(function.full_name, '只有eth,本身函数体内没reetrance')
-                    isReentrancy, suspiciouPathLength = self.recursion_backTrack(function, fatherFunctionLayerCount)
+                    continue  # 直接开始分析下一个函数
+
+                if not isReentrancy and function_canEth:  # 如果说本函数分析后发现不是reentrance 而且本函数canEth.那么就回找本函数的fatherfunciton
+                    print(function.full_name, '只可以传送eth,但自身函数体内没reetrance的结构')
+                    isReentrancy, suspiciouPathLength = self.recursion_backTrack(function, fatherFunctionLayerCount)  # 递归的去回溯它的fatherFunciton(也就是那个函数调用了这个canEthFunction)
                     if isReentrancy == True:
                         print('Reentrance in {}.{} 可疑路径长度 = {}'.format(function.contract.name, function.full_name, suspiciouPathLength))
                     else:
@@ -161,10 +167,18 @@ class SpcificReen(AbstractDetector):
                     #                 print('进行脏数据分析')
                     #             elif:   # 如果没找到，找calledFunction中所有的interal call
                     #                 if calledInternalFuntionNode.internal_calls:
+
     def recursion_backTrack(self, function, fatherFunctionLayerCount):
-        fatherFunctionList, result = self.backTrackParse(function)
+        """
+            递归的进行回溯分析
+            function: 当前函数，准备去找它的fatherFunction
+            fatherFunctionLayerCount: 记录fatherFunction到了哪一级
+            :return
+            True/Fale(是否是reentrance), fatherFunctionLayerCount(总共回溯了几层)
+        """
+        fatherFunctionList, result = self.backTrackParse(function)  # 进行回溯
         if result == False:  # 上一层的回溯检测为安全,那么准备进行下一层fatherFunction的回溯检测
-            if fatherFunctionList:  # 如果存在下一轮fatherFunction
+            if fatherFunctionList:  # 如果存在下一层fatherFunction
                 fatherFunctionLayerCount += 1
                 for fatherFunction in fatherFunctionList:
                     print('追到了第 {} 层的爸爸函数：{}'.format(fatherFunctionLayerCount, fatherFunction.full_name))
@@ -191,11 +205,16 @@ class SpcificReen(AbstractDetector):
         #         print("回溯后发现依然安全")
         #         return False, 0
     def backTrackParse(self, function):
+        '''
+
+        :param function: 从哪那个函数开始回溯的
+        :return: fatherFunctionList(这次回溯层的爸爸函数们), result_for_fatherFunction(这次回溯的调研结果)
+        '''
         result_for_fatherFunction = False
-        fatherFunctionList = self.getfatherFunctions(function)  #得到testhhh的爸爸，也就是zhongji
+        fatherFunctionList = self.getfatherFunctions(function)  #得到当前函数的所有fatherfuncions
         node_calling_ethFunctionWithoutReen = []    # 用于存储那些node(node调用了一个ethFuncion(但是没有reen))
 
-        for fatherFunction in fatherFunctionList:  # 第一层fatherFunction
+        for fatherFunction in fatherFunctionList:
             #print(fatherFunction.full_name)
             high_level_calls = []
             nodes = self._getAllNodes(fatherFunction)   # 得到fatherFunction得所有节点
@@ -244,7 +263,7 @@ class SpcificReen(AbstractDetector):
         return False
 
     def _externalCallLinkparse(self, node):
-        externalCallLink_parse_Result = 0
+        externalCallLink_parse_Result = 0  # 证明这个调用链的dest不脏
         """
         :param node: 含有外部调用的node（跨合约）
         :return: 如果确实是脏数据则返回1
@@ -276,7 +295,7 @@ class SpcificReen(AbstractDetector):
                         print('准备跳转到外部调用函数中：', calledExternalFunction.full_name)
                         calledExternalFunctionNodeList = self._getAllNodes(calledExternalFunction)
                         for calledExternalFunctionNode in calledExternalFunctionNodeList:
-                            externalCallLink_parse_Result = self._analyzerCallLink(calledExternalFunctionNode)  # 针对具体例子写的注释： 这个节点应该是个lowlevelcall
+                            externalCallLink_parse_Result = self._analyzerCallLink(calledExternalFunctionNode)
                             if externalCallLink_parse_Result == 1:
                                 return externalCallLink_parse_Result
 
@@ -291,13 +310,14 @@ class SpcificReen(AbstractDetector):
            如果含有external node，调用self._externalCallLinkparse(calledInternalFuntionNode)
            否则，调用自己
         '''
+        print('进入内部调用链分析')
         if node.internal_calls:  # 如果后续节点是internal call 节点那么跳入到call graph
             for internal_call in node.internal_calls:  # 进入call graph
                 calledInternalFuntion = internal_call  # 得到called interalFuntion对象
                 calledInternalFuntionNodeList = self._getAllNodes(calledInternalFuntion)  # 得到calledInteralFuntion的所有节点列表
                 for calledInternalFuntionNode in calledInternalFuntionNodeList:  # 遍历节点列表，为了寻找含有high_level_call或low_level_call的节点
                     if calledInternalFuntionNode.high_level_calls or calledInternalFuntionNode.low_level_calls:  # 如果找到含有外部调用节点
-                        result = self._externalCallLinkparse(calledInternalFuntionNode)
+                        result = self._externalCallLinkparse(calledInternalFuntionNode)  # ！！
                         if result == 1:
                             internalCallLinkparse_Result = 1
                             return internalCallLinkparse_Result
@@ -312,13 +332,18 @@ class SpcificReen(AbstractDetector):
 
 
     def getfatherFunctions(self, currentFunction):
-        fatherFunctions = []
+        '''
+
+        :param currentFunction: 当前函数
+        :return: fatherFunctions（list:当前函数的所有fatherfunction）
+        '''
+        fatherFunctions = []  # 用于存储当前函数的所有fatherfunction，也就是返回值
         for contract in self.contracts:
             for function in contract.functions_and_modifiers_declared:
-                high_level_calls = []
-                print('现在遍历到的函数是: {function_name}'.format(function_name=function.full_name))
-                print('外部调用：', function.high_level_calls)
-                print('内部调用：', function.internal_calls)
+                high_level_calls = []  # 存每一个函数的外部（目前highlevel，还缺少lowlevel）调用函数
+                print('现在遍历到的函数是: {}.{}'.format(function.contract.name, function.full_name))
+                print('外部调用列表：', function.high_level_calls)
+                print('内部调用列表：', function.internal_calls)
                 for high_level_call_tuple in function.high_level_calls:  # 因为function.high_level_calls返回值为这样的存储形式[(contract, funtion), (contract, function), ...].故需要提取出function
                     high_level_calls.append(high_level_call_tuple[1])
                 if currentFunction in list(set(function.internal_calls + high_level_calls)):  # 暂时不考虑function.low_level_calls
@@ -327,8 +352,8 @@ class SpcificReen(AbstractDetector):
                 # for function in function.internal_calls + high_level_calls:
                 #     if (currentFunction._contract.name == function._contract.name and currentFunction.full_name == function.full_name):
                 #         fatherFunctions.append(function)
-        print('----------fatherFunction层分割线--------  爸爸们的个数{}'.format(len(fatherFunctions)))
-        for fatherFunction in fatherFunctions:  # 第一层fatherFunction
+        print('----------fatherFunction层分割线--------  爸爸函数们的个数{}'.format(len(fatherFunctions)))
+        for fatherFunction in fatherFunctions:
             print(fatherFunction.full_name)
         return fatherFunctions
 
