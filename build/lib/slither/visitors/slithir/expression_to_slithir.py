@@ -66,7 +66,7 @@ class ExpressionToSlithIR(ExpressionVisitor):
         self._node = node
         self._result = []
         self._visit_expression(self.expression)
-        if node.type == NodeType.RETURN:
+        if node.type == NodeType.RETURN:  # RETURN = 0x11      # RETURN may contain an expression
             self._result.append(Return(get(self.expression)))
         for ir in self._result:
             ir.set_node(node)

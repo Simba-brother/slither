@@ -32,10 +32,11 @@ def is_dependent(variable, source, context, only_unprotected=False):
         return False
     if variable == source:
         return True
-    context = context.context
+    context = context.context     # context (Contract|Function)
 
     if only_unprotected:
         return variable in context[KEY_NON_SSA_UNPROTECTED] and source in context[KEY_NON_SSA_UNPROTECTED][variable]
+        # KEY_NON_SSA = "DATA_DEPENDENCY"
     return variable in context[KEY_NON_SSA] and source in context[KEY_NON_SSA][variable]
 
 def is_dependent_ssa(variable, source, context, only_unprotected=False):
@@ -56,6 +57,7 @@ def is_dependent_ssa(variable, source, context, only_unprotected=False):
         return True
     if only_unprotected:
         return variable in context[KEY_SSA_UNPROTECTED] and source in context[KEY_SSA_UNPROTECTED][variable]
+        # KEY_SSA = "DATA_DEPENDENCY_SSA"
     return variable in context[KEY_SSA] and source in context[KEY_SSA][variable]
 
 GENERIC_TAINT = {SolidityVariableComposed('msg.sender'),
@@ -77,7 +79,7 @@ def is_tainted(variable, context, only_unprotected=False, ignore_generic_taint=F
     if isinstance(variable, Constant):
         return False
     slither = context.slither
-    taints = slither.context[KEY_INPUT]
+    taints = slither.context[KEY_INPUT] # KEY_INPUT = "DATA_DEPENDENCY_INPUT"
     if not ignore_generic_taint:
         taints |= GENERIC_TAINT
     return variable in taints or any(is_dependent(variable, t, context, only_unprotected) for t in taints)

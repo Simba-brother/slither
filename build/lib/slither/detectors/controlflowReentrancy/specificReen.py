@@ -9,7 +9,7 @@
 from slither.detectors.abstract_detector import (AbstractDetector, DetectorClassification)
 from slither.slithir.operations import (HighLevelCall, LowLevelCall, LibraryCall, Send, Transfer)
 from slither.analyses.data_dependency.data_dependency import is_tainted
-
+from slither.slithir.variables.constant import Constant
 class SpcificReen(AbstractDetector):
     ARGUMENT = 'SpcificReen'
     HELP = 'Benign reentrancy vulnerabilities'
@@ -54,6 +54,7 @@ class SpcificReen(AbstractDetector):
     def detect_reentrancy(self, contract):
         for function in contract.functions_and_modifiers_declared:
             if function.is_implemented:
+
                 '''
                 if self.KEY in function.context:print(function.high_level_calls)
                 print(function.internal_calls)
@@ -102,11 +103,16 @@ class SpcificReen(AbstractDetector):
                 #
 
                 # 得到每一个eth_node的后续节点并进行存储到after_ethNodeList列表中
+                if function_canEth == False:
+                    print('合约{}.函数{} 不含有直接转张功能,跳过此函数的分析'.format(function.contract.name, function.full_name))
+                    continue
                 for eth_node in eth_nodes:
                     after_ethNodeList.append(eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
                     self._getAllbehindNode(eth_node, after_ethNodeList)
 
                 # 从after_ethNodeList列表中取出所有的节点（记为afterEthNode）, 然后进行调用链的分析
+                if after_ethNodeList:
+                    print('开始分析 合约{}.函数{}'.format(function.contract.name, function.full_name))
                 for afterEthNode in after_ethNodeList:
                     result = self._analyzerCallLink(afterEthNode)  # False代表没有检测到reentrance
                     if result == True:
@@ -123,8 +129,12 @@ class SpcificReen(AbstractDetector):
                     isReentrancy, suspiciouPathLength, callPath = self.recursion_backTrack(function, fatherFunctionLayerCount, callPath)  # 递归的去回溯它的fatherFunciton(也就是那个函数调用了这个canEthFunction)
                     if isReentrancy == True:
                         print('Reentrance in {}.{} 可疑路径： {} 可疑路径长度 = {}'.format(function.contract.name, function.full_name, callPath, suspiciouPathLength))
+                        print('==========================================================================================================')
+                        print('==========================================================================================================')
                     else:
                         print('No Reentrance in {}.{}'.format(function.contract.name, function.full_name))
+                        print('================================================================================')
+                        print('================================================================================')
                     '''
                     fatherFunctionList, result = self.backTrackParse(function)
 
@@ -294,7 +304,8 @@ class SpcificReen(AbstractDetector):
             #     taintflag = True
             print('进行脏数据分析...')
             for ir in node.irs:
-                taintflag = is_tainted(ir.destination, node.function.contract)
+                if hasattr(ir, 'destination'):
+                    taintflag = is_tainted(ir.destination, node.function.contract)
             if taintflag:   # 如果数据脏则打印Reentrance
                 print('脏')
                 externalCallLink_parse_Result = 1
@@ -380,6 +391,10 @@ class SpcificReen(AbstractDetector):
         for ir in irs:
             if isinstance(ir, (HighLevelCall, LowLevelCall, Transfer, Send)):
                 if ir.call_value:
+                    # print(type(ir.call_value))  # <class 'slither.slithir.variables.constant.Constant'>
+                    # print(str(ir.call_value))
+                    if isinstance(ir.call_value, Constant) and str(ir.call_value) == '0':
+                        return False
                     return True
         return False
 
@@ -388,14 +403,13 @@ class SpcificReen(AbstractDetector):
     #        # print('{} -> {}'.format(type(function.visibility), function.visibility))
     #        if function.visibility in ['public', 'external']:
     #            for node in function.nodes:
+    #                taintRes = False
     #                if node.high_level_calls or node.low_level_calls:
     #                    for ir in node.irs:
-    #                         taintRes = is_tainted(ir.destination, function.contract)
-    #                         print('Function: {} dest: {} isTaint {}'.format(function.full_name, ir.destination, taintRes))
-    #                # for ir in node.irs:
-    #                #     if isinstance(ir, LowLevelCall) and ir.function_name in ['delegatecall', 'callcode']:
-    #                #         if is_tainted(ir.destination, function.contract):
-
+    #                        if hasattr(ir, 'destination'):
+    #                            taintRes = is_tainted(ir.destination, function.contract)
+    #                            print('Function: {} dest: {}  isTaint {}'.format(function.full_name, ir.destination, taintRes))
+    #
 
 
          

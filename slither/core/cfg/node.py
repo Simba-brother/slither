@@ -36,7 +36,7 @@ class NodeType:
     ENTRYPOINT = 0x0
 
     # Node with expression
-    EXPRESSION = 0x10  # normal case
+    EXPRESSION = 0x10  # normal case  十进制16
     RETURN = 0x11      # RETURN may contain an expression
     IF = 0x12
     VARIABLE = 0x13    # Declaration of variable
