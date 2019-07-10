@@ -125,6 +125,8 @@ slither/detectors/statements/deprecated_calls.py
 slither/detectors/statements/incorrect_strict_equality.py
 slither/detectors/statements/too_many_digits.py
 slither/detectors/statements/tx_origin.py
+slither/detectors/taintAnalyzer/__init__.py
+slither/detectors/taintAnalyzer/testTaint.py
 slither/detectors/variables/__init__.py
 slither/detectors/variables/possible_const_state_variables.py
 slither/detectors/variables/uninitialized_local_variables.py

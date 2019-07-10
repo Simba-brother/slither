@@ -10,6 +10,7 @@ from slither.slithir.variables import (Constant, LocalIRVariable,
                                        StateIRVariable, TemporaryVariable,
                                        TemporaryVariableSSA, TupleVariableSSA)
 from slither.core.solidity_types.type import Type
+from slither.core.variables.local_variable import LocalVariable
 
 ###################################################################################
 ###################################################################################
@@ -32,7 +33,7 @@ def is_dependent(variable, source, context, only_unprotected=False):
         return False
     if variable == source:
         return True
-    context = context.context     # context (Contract|Function)
+    context = context.context     # context (Contract|Function) 得到合约或函数的上下文对象
 
     if only_unprotected:
         return variable in context[KEY_NON_SSA_UNPROTECTED] and source in context[KEY_NON_SSA_UNPROTECTED][variable]
@@ -76,10 +77,16 @@ def is_tainted(variable, context, only_unprotected=False, ignore_generic_taint=F
     '''
     assert isinstance(context, (Contract, Function))
     assert isinstance(only_unprotected, bool)
-    if isinstance(variable, Constant):
+    if isinstance(variable, Constant):  # 变量是常量那么not taint
         return False
     slither = context.slither
     taints = slither.context[KEY_INPUT] # KEY_INPUT = "DATA_DEPENDENCY_INPUT"
+    taint_in_constructor = set()
+    for taint in taints:
+        if isinstance(taint, LocalVariable):
+            if taint.function.is_constructor:
+                taint_in_constructor.add(taint)
+    taints = taints - taint_in_constructor
     if not ignore_generic_taint:
         taints |= GENERIC_TAINT
     return variable in taints or any(is_dependent(variable, t, context, only_unprotected) for t in taints)
