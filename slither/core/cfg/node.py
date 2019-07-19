@@ -115,8 +115,8 @@ class Node(SourceMapping, ChildFunction):
     """
     Node class
 
-    """
 
+    """
     def __init__(self, node_type, node_id):
         super(Node, self).__init__()
         self._node_type = node_type

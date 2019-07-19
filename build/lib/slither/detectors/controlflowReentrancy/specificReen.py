@@ -128,11 +128,11 @@ class SpcificReen(AbstractDetector):
                     print(function.full_name, '只可以传送eth,但自身函数体内没reetrance的结构')
                     isReentrancy, suspiciouPathLength, callPath = self.recursion_backTrack(function, fatherFunctionLayerCount, callPath)  # 递归的去回溯它的fatherFunciton(也就是那个函数调用了这个canEthFunction)
                     if isReentrancy == True:
-                        print('Reentrance in {}.{} 可疑路径： {} 可疑路径长度 = {}'.format(function.contract.name, function.full_name, callPath, suspiciouPathLength))
+                        print('ReentranceCallChain in {}.{} 可疑路径： {} 可疑路径长度 = {}'.format(function.contract.name, function.full_name, callPath, suspiciouPathLength))
                         print('==========================================================================================================')
                         print('==========================================================================================================')
                     else:
-                        print('No Reentrance in {}.{}'.format(function.contract.name, function.full_name))
+                        print('No ReentranceCallChain in {}.{}'.format(function.contract.name, function.full_name))
                         print('================================================================================')
                         print('================================================================================')
                     '''

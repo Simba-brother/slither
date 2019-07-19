@@ -13,6 +13,9 @@ slither/analyses/write/are_variables_written.py
 slither/core/__init__.py
 slither/core/exceptions.py
 slither/core/slither_core.py
+slither/core/callGraph/CallGraph.py
+slither/core/callGraph/__init__.py
+slither/core/callGraph/functionNode.py
 slither/core/cfg/__init__.py
 slither/core/cfg/node.py
 slither/core/children/__init__.py
@@ -127,6 +130,8 @@ slither/detectors/statements/too_many_digits.py
 slither/detectors/statements/tx_origin.py
 slither/detectors/taintAnalyzer/__init__.py
 slither/detectors/taintAnalyzer/testTaint.py
+slither/detectors/testCallGraph/__init__.py
+slither/detectors/testCallGraph/testCallgraph.py
 slither/detectors/variables/__init__.py
 slither/detectors/variables/possible_const_state_variables.py
 slither/detectors/variables/uninitialized_local_variables.py

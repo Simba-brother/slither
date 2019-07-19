@@ -21,7 +21,7 @@ def _contract_subgraph(contract):
 
 # return unique id for contract function to use as node name
 def _function_node(contract, function):
-    return f'{contract.id}_{function.name}'
+    return f'{contract.id}_{function.signature_str}'
 
 # return unique id for solidity function to use as node name
 def _solidity_function_node(solidity_function):
@@ -81,7 +81,7 @@ class PrinterCallGraph(AbstractPrinter):
 
     def _process_function(self, contract, function, contract_functions, contract_calls, solidity_functions, solidity_calls, external_calls, all_contracts):
         contract_functions[contract].add(
-            _node(_function_node(contract, function), function.name),  # 这里用funciton.name无法实现重载带来的需求
+            _node(_function_node(contract, function), function.signature_str),  # 这里用funciton.name无法实现重载带来的需求
         )
 
         for internal_call in function.internal_calls:
