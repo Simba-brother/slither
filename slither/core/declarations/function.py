@@ -90,6 +90,7 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
         # set(ReacheableNode)
         self._reachable_from_nodes = set()
         self._reachable_from_functions = set()
+        self._canEth = False
 
 
     ###################################################################################
@@ -97,6 +98,13 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
     # region General properties
     ###################################################################################
     ###################################################################################
+
+    @property
+    def canEth(self):
+        return self._canEth
+
+    def set_canEth(self, canEth):
+        self._canEth = canEth
 
     @property
     def name(self):

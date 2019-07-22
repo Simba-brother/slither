@@ -2,6 +2,7 @@ from slither.core.declarations.solidity_variables import SolidityFunction
 from slither.core.declarations.function import Function
 from slither.core.callGraph.functionNode import FunctionNode
 from slither.core.variables.variable import Variable
+from slither.analyses.data_dependency.data_dependency import is_tainted
 
 
 class CallGraph:
@@ -13,16 +14,28 @@ class CallGraph:
         self._all_contracts = set()
         self._setFunctionNodes(self.slither.functions)
         self._process_functionNodes(self._FunctionNodes)
-
+        self._taintFunctionNodes = []
 
     def _setFunctionNodes(self, funcitons):
         for function in funcitons:
+            taintFlag = False
+            for node in function.nodes:
+                if node.high_level_calls or node.low_level_calls:
+                    for ir in node.irs:
+                        if hasattr(ir, 'destination'):
+                            taintflag = is_tainted(ir.destination, node.function.contract)
             functionNode = FunctionNode(self._counter_FunctionNodes, function)
             functionNode.set_contract(function.contract)
+            functionNode.setTaint(taintFlag)
+            if taintFlag == True:
+                self._taintFunctionNodes.append(function)
             self._FunctionNodes.append(functionNode)
             self.function_Map_node[function] = functionNode
             self._counter_FunctionNodes += 1
             self._all_contracts.add(function.contract)
+    @property
+    def taintFunctionNodes(self):
+        return self._taintFunctionNodes
 
     def _process_functionNodes(self, functionNodes):
         for functionNode in functionNodes:

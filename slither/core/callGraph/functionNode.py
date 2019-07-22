@@ -12,7 +12,15 @@ class FunctionNode(SourceMapping, ChildContract):
         self._sons = []
         self._fathers = []
         self._function = function
-        self.taint = False
+        self._taint = False
+
+    @property
+    def tiant(self):
+        return self._taint
+
+    def setTaint(self, taint):
+        self._taint = taint
+
     @property
     def function(self):
         return self._function
