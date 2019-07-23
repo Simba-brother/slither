@@ -34,10 +34,9 @@ class Reentrancy(AbstractDetector):
 
     KEY = 'REENTRANCY'
 
-    def _can_callback(self, irs):
+    def _can_callback(self, irs): # irs = node.irs + slithir_operations
         """
-            Detect if the node contains a call that can
-            be used to re-entrance
+            Detect if the node contains a call that can be used to re-entrance
 
             Consider as valid target:
             - low level call
@@ -56,8 +55,7 @@ class Reentrancy(AbstractDetector):
                     if isinstance(ir.function, Variable):
                         continue
                 # If there is a call to itself
-                # We can check that the function called is
-                # reentrancy-safe
+                # We can check that the function called is reentrancy-safe
                 if ir.destination == SolidityVariable('this'):
                     if isinstance(ir.function, Variable):
                         continue
@@ -109,14 +107,14 @@ class Reentrancy(AbstractDetector):
         visited = visited + [node]
 
         # First we add the external calls executed in previous nodes
-        # send_eth returns the list of calls sending value
-        # calls returns the list of calls that can callback
-        # read returns the variable read
-        # read_prior_calls returns the variable read prior a call
+        # 'send_eth' returns the list of calls sending value
+        # 'calls' returns the list of calls that can callback
+        # 'read' returns the variable read
+        # 'read_prior_calls' returns the variable read prior a call
         fathers_context = {'send_eth':set(), 'calls':set(), 'read':set(), 'read_prior_calls':{}}
 
         for father in node.fathers:
-            if self.KEY in father.context:
+            if self.KEY in father.context:  # 'REENTRANCY'
                 fathers_context['send_eth'] |= set([s for s in father.context[self.KEY]['send_eth'] if s!=skip_father])
                 fathers_context['calls'] |= set([c for c in father.context[self.KEY]['calls'] if c!=skip_father])
                 fathers_context['read'] |= set(father.context[self.KEY]['read'])
@@ -183,10 +181,10 @@ class Reentrancy(AbstractDetector):
         """
         for function in contract.functions_and_modifiers_declared:
             if function.is_implemented:
-                if self.KEY in function.context:
+                if self.KEY in function.context:     # self.KEY = 'REENTRANCY'
                     continue
                 self._explore(function.entry_point, [])
-                function.context[self.KEY] = True
+                function.context[self.KEY] = True   # {‘REENTRANCY’:True}, 也就是说这个函数Reentrancy detector已经检测过了
 
     def _detect(self):
         """

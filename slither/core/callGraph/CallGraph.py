@@ -15,7 +15,7 @@ class CallGraph:
         self._setFunctionNodes(self.slither.functions)
         self._process_functionNodes(self._FunctionNodes)
         self._taintFunctionNodes = []
-
+        self._adjoin = []
     def _setFunctionNodes(self, funcitons):
         for function in funcitons:
             taintFlag = False
@@ -33,6 +33,11 @@ class CallGraph:
             self.function_Map_node[function] = functionNode
             self._counter_FunctionNodes += 1
             self._all_contracts.add(function.contract)
+
+    @property
+    def functionNodes(self):
+        return self._FunctionNodes
+
     @property
     def taintFunctionNodes(self):
         return self._taintFunctionNodes
@@ -72,6 +77,14 @@ class CallGraph:
     def link_FuncitonNodes(self, n1, n2):
         n1.add_son(n2)
         n2.add_father(n1)
+
+    def set_adjoin(self):
+        for functionNode in self._FunctionNodes:
+            for son in functionNode.sons:
+                self._adjoin.append(set([functionNode, son]))
+    @property
+    def adjoin(self):
+        return self._adjoin
 
     def test(self, function):
         functionNode = self.function_Map_node.get(function)

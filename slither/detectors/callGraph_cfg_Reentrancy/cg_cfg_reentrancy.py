@@ -3,7 +3,9 @@ from slither.detectors.abstract_detector import (AbstractDetector, DetectorClass
 from slither.slithir.operations import (HighLevelCall, LowLevelCall, LibraryCall, Send, Transfer)
 from slither.analyses.data_dependency.data_dependency import is_tainted
 from slither.slithir.variables.constant import Constant
-from  slither.core.callGraph.CallGraph import CallGraph
+from slither.core.callGraph.CallGraph import CallGraph
+from slither.detectors.callGraph_cfg_Reentrancy.Graph import MyGraph
+from slither.core.declarations.function import Function
 
 class CgCfgReentrancy(AbstractDetector):
     ARGUMENT = 'CgCfgReentrancy'
@@ -109,12 +111,64 @@ class CgCfgReentrancy(AbstractDetector):
                 if not isReentrancy and function.canEth == True:  # 进行forward call graph
                     print(function.full_name, '可以传送eth,但自身函数体内直接的没reetrance的结构需要进行前向的call graph')
                     function_canEth_Node = self.callGraph.function_Map_node.get(function)
-                    self.forwardTraversalCallGraph(function_canEth_Node)
-
-    def forwardPath(self, functionNode):
+                    forwardDangerPath = self.forwardPath(function_canEth_Node, function, after_ethNodeList)
+                    if forwardDangerPath:
+                        print('forward Reentrancy, Path:{}'.format(forwardDangerPath))
+                        continue    #这个地方是否continue还得考虑
+                    self.backwardPath(function_canEth_Node)
+    def backwardPath(self, functionNode):
+        forwardDangerPath = []
         for taintFunctionNode in self.callGraph.taintFunctionNodes:
-            pass
-            #forward call graph求functionNode到taintFunctionNode所有路径
+            taintToethList = []
+            taintToethList.append(taintFunctionNode)
+            pilotProcessNodes = set(self.callGraph.functionNodes) - set([functionNode, taintFunctionNode])
+            taintToethList.extend(list(pilotProcessNodes))
+            taintToethList.append(functionNode)
+            node_num = len(taintToethList)
+            graph = MyGraph(node_num)
+            for functionNode in taintToethList[0:node_num-1]:
+                for son in functionNode.sons:
+                    graph.addEdge(taintToethList.index(functionNode)+1, taintToethList.index(son)+1)
+            allPaths = graph.findAllPathBetweenTwoNodes(taintToethList.index(functionNode)+1, taintToethList.index(taintFunctionNode)+1)
+
+    def forwardPath(self, functionNode, currentFunction, after_ethNodeList):
+        forwardDangerPath = []
+        for taintFunctionNode in self.callGraph.taintFunctionNodes:
+            ethToTaintList = []
+            ethToTaintList.append(functionNode)
+            pilotProcessNodes = set(self.callGraph.functionNodes) - set([functionNode, taintFunctionNode])
+            ethToTaintList.extend(list(pilotProcessNodes))
+            ethToTaintList.append(taintFunctionNode)
+            node_num = len(ethToTaintList)
+            graph = MyGraph(node_num)
+            for functionNode in ethToTaintList[0:node_num-1]:
+                for son in functionNode.sons:
+                    graph.addEdge(ethToTaintList.index(functionNode)+1, ethToTaintList.index(son)+1)
+            # type list of list
+            allPaths = graph.findAllPathBetweenTwoNodes(ethToTaintList.index(functionNode)+1, ethToTaintList.index(taintFunctionNode)+1)
+            for path in allPaths:
+                care_callee_Funciton = ethToTaintList[path[-2]-1]  # [taint, fx, fy, fz, eth_function] 此时得到fz
+                # 遍历cfg寻找先后关系 care_callee_function(node)在后，eth(node)在前
+                reentrancyFlag = self.traverseCFG(currentFunction, care_callee_Funciton, after_ethNodeList)
+                if reentrancyFlag is True:
+                    forwardDangerPath.append(path)
+        return forwardDangerPath
+
+    def traverseCFG(self, calleeFunciton, after_ethNodeList):
+        for after_ethNode in after_ethNodeList:
+            internal_calls = after_ethNode.internal_calls
+            external_calls = []
+            for external_call in after_ethNode.high_level_calls:
+                external_contract, external_function = external_call
+                external_calls.append(external_function)
+
+            for call in set(internal_calls.expend(external_calls)):
+                if isinstance(call, (Function)):
+                    if call == calleeFunciton:
+                       return True
+        return False
+
+
 
 
 
