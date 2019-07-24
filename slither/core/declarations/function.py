@@ -27,7 +27,6 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
     def __init__(self):
         super(Function, self).__init__()
         self.taintNodes = []
-        self.after_taintNodeList = []
         self._name = None
         self._view = None
         self._pure = None
