@@ -34,25 +34,39 @@ class CgCfgReentrancy(AbstractDetector):
     WIKI_RECOMMENDATION = 'Apply the [check-effects-interactions pattern](http://solidity.readthedocs.io/en/v0.4.21/security-considerations.html#re-entrancy).'
 
     def _detect(self):
-        self.callGraph = CallGraph(self.slither)
+        callGraph = CallGraph(self.slither)
         for c in self.contracts:
-            self.detect_reentrancy(c)
+            self.detect_reentrancy(c, callGraph)
         return []
-    def detect_reentrancy(self, contract):
+    def detect_reentrancy(self, contract, callGraph):
+        for taintFunctionNode in callGraph.taintFunctionNodes:
+            taintFunciton = taintFunctionNode.function
+            for node in taintFunciton.nodes:
+                    if node.high_level_calls or node.low_level_calls:
+                        for ir in node.irs:
+                            if hasattr(ir, 'destination'):
+                                taintflag = is_tainted(ir.destination, node.function.contract)
+                                if taintflag:
+                                    taintFunciton.taintNodes.append(node)
+            for taintNode in taintFunciton.taintNodes:
+                self._getAllbehindNode(taintNode, taintFunciton.after_taintNodeList)
+
         for function in contract.functions_and_modifiers_declared:
             if function.is_implemented:
                 callPath = []
                 fatherFunctionLayerCount = 0  # 回溯调用记录的层数
                 eth_nodes = []  # 存储本函数含有转帐功能的cfg节点
+                taint_nodes = []
                 isReentrancy = False  # False代表没有检测到reentrance
                 after_ethNodeList = []  # 用于存储转账节点的所有后续节点
-
+                afer_taintNodeList = []
                 # 往 eth_nodes列表中append值
                 nodes = function.nodes  # 得到函数中所有的节点
                 for node in nodes:
                     if self._can_send_eth(node.irs):  # 如果这个节点可以发送eth
                         function.set_canEth(True)
                         eth_nodes.append(node)
+
                         '''
                         if node.low_level_calls:            # 如果是LowLevelCall发送eth
                             lowlevelCall_eth_Nodes.append(node)
@@ -111,13 +125,15 @@ class CgCfgReentrancy(AbstractDetector):
                 if not isReentrancy and function.canEth == True:  # 进行forward call graph
                     print(function.full_name, '可以传送eth,但自身函数体内直接的没reetrance的结构需要进行前向的call graph')
                     function_canEth_Node = self.callGraph.function_Map_node.get(function)
-                    forwardDangerPath = self.forwardPath(function_canEth_Node, function, after_ethNodeList)
+                    forwardDangerPath = self.forwardPath(function_canEth_Node, function, after_ethNodeList, callGraph)
                     if forwardDangerPath:
                         print('forward Reentrancy, Path:{}'.format(forwardDangerPath))
                         continue    #这个地方是否continue还得考虑
-                    self.backwardPath(function_canEth_Node)
+                    backwardDangerPath =  self.backwardPath(function_canEth_Node)
+                    if backwardDangerPath:
+                        print('backward Reetrancy, Path:{}'.format(backwardDangerPath))
     def backwardPath(self, functionNode):
-        forwardDangerPath = []
+        backwardDangerPath = []
         for taintFunctionNode in self.callGraph.taintFunctionNodes:
             taintToethList = []
             taintToethList.append(taintFunctionNode)
@@ -130,10 +146,16 @@ class CgCfgReentrancy(AbstractDetector):
                 for son in functionNode.sons:
                     graph.addEdge(taintToethList.index(functionNode)+1, taintToethList.index(son)+1)
             allPaths = graph.findAllPathBetweenTwoNodes(taintToethList.index(functionNode)+1, taintToethList.index(taintFunctionNode)+1)
+            for path in allPaths:
+                care_callee_Funciton = taintToethList[path[1] - 1]
+                reentrancyFlag = self.traverseCFG_backwardProcess(taintFunctionNode.function, care_callee_Funciton)
+                if reentrancyFlag is True:
+                    backwardDangerPath.append(path)
+        return backwardDangerPath
 
-    def forwardPath(self, functionNode, currentFunction, after_ethNodeList):
+    def forwardPath(self, functionNode, currentFunction, after_ethNodeList, callGraph):
         forwardDangerPath = []
-        for taintFunctionNode in self.callGraph.taintFunctionNodes:
+        for taintFunctionNode in callGraph.taintFunctionNodes:
             ethToTaintList = []
             ethToTaintList.append(functionNode)
             pilotProcessNodes = set(self.callGraph.functionNodes) - set([functionNode, taintFunctionNode])
@@ -149,12 +171,12 @@ class CgCfgReentrancy(AbstractDetector):
             for path in allPaths:
                 care_callee_Funciton = ethToTaintList[path[-2]-1]  # [taint, fx, fy, fz, eth_function] 此时得到fz
                 # 遍历cfg寻找先后关系 care_callee_function(node)在后，eth(node)在前
-                reentrancyFlag = self.traverseCFG(currentFunction, care_callee_Funciton, after_ethNodeList)
+                reentrancyFlag = self.traverseCFG_forwardProcess(currentFunction, care_callee_Funciton, after_ethNodeList)
                 if reentrancyFlag is True:
                     forwardDangerPath.append(path)
         return forwardDangerPath
 
-    def traverseCFG(self, calleeFunciton, after_ethNodeList):
+    def traverseCFG_forwardProcess(self, calleeFunciton, after_ethNodeList):
         for after_ethNode in after_ethNodeList:
             internal_calls = after_ethNode.internal_calls
             external_calls = []
@@ -168,10 +190,26 @@ class CgCfgReentrancy(AbstractDetector):
                        return True
         return False
 
+    def traverseCFG_backwardProcess(self, function, calleeFunciton):
+        node_callees = []
+        after_node_callees = []
+        for node in function.nodes:
+            internal_calls = node.internal_calls
+            external_calls = []
+            for external_call in node.high_level_calls:
+                external_contract, external_function = external_call
+                external_calls.append(external_function)
+            for call in set(internal_calls.expend(external_calls)):
+                if isinstance(call, (Function)):
+                    if call == calleeFunciton:
+                        node_callees.append(node)
 
-
-
-
+        for node_callee in node_callees:
+            self._getAllbehindNode(node_callee, after_node_callees)
+        intersection = list(set(after_node_callees) & set(function.taintNodes))
+        if len(intersection) != 0:
+            return True
+        return False
     def recursion_backTrack(self, function, fatherFunctionLayerCount, callPath):
         """
             递归的进行回溯分析

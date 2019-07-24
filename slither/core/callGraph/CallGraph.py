@@ -16,6 +16,7 @@ class CallGraph:
         self._process_functionNodes(self._FunctionNodes)
         self._taintFunctionNodes = []
         self._adjoin = []
+
     def _setFunctionNodes(self, funcitons):
         for function in funcitons:
             taintFlag = False
@@ -24,6 +25,10 @@ class CallGraph:
                     for ir in node.irs:
                         if hasattr(ir, 'destination'):
                             taintflag = is_tainted(ir.destination, node.function.contract)
+                            if taintFlag:
+                                break
+                    if taintFlag:
+                        break
             functionNode = FunctionNode(self._counter_FunctionNodes, function)
             functionNode.set_contract(function.contract)
             functionNode.setTaint(taintFlag)
