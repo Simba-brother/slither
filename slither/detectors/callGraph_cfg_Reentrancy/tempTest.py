@@ -19,8 +19,7 @@ def test():
 
 
 def test2():
-    a = []
-    b = [1]
-    for item in set(a + b):
-        print('mm')
+    a = [1,111,1]
+    a = list(set(a))
+    print(a)
 test2()

@@ -152,29 +152,38 @@ class CgCfgReentrancy(AbstractDetector):
                             huamnlook_backwardDangerPath.append(temp)
                         print('{}.{} backward Reentrancy, Path:{}'.format(function.contract.name, function.full_name, huamnlook_backwardDangerPath))
 
-    def backwardPath(self, functionNode, callGraph):
+    def backwardPath(self, functioncanEthNode, callGraph):
+        '''
+        :param functionNode: function_canETH对应的callgraph node
+        :param callGraph:
+        :return: callGraph对象(单例)
+        '''
         print('开始进入后向路径分析')
         backwardDangerPath = []  # 最后结果是list of list
         for taintFunctionNode in callGraph.taintFunctionNodes:  # 得到call graph中所有的taintFunctionNode
+            if functioncanEthNode is taintFunctionNode:
+                continue
             taintToethList = []  # 【Vt, Vx, Vy, Ve】
             taintToethList.append(taintFunctionNode)
-            pilotProcessNodes = set(callGraph.functionNodes) - set([functionNode, taintFunctionNode])
+            pilotProcessNodes = set(callGraph.functionNodes) - set([functioncanEthNode, taintFunctionNode])
             taintToethList.extend(list(pilotProcessNodes))
-            taintToethList.append(functionNode)
+            taintToethList.append(functioncanEthNode)
             node_num = len(taintToethList)
             graph = MyGraph(node_num)
             for functionNode in taintToethList[0:node_num-1]:
                 for son in functionNode.sons:
                     graph.addEdge(taintToethList.index(functionNode)+1, taintToethList.index(son)+1)
-            allPaths = graph.findAllPathBetweenTwoNodes(taintToethList.index(functionNode)+1, taintToethList.index(taintFunctionNode)+1)
+            allPaths = graph.findAllPathBetweenTwoNodes(taintToethList.index(taintFunctionNode)+1, (len(taintToethList)-1)+1)
             for path in allPaths:  # [[Ve, Vx, Vy, Vt], [...], [...]]   path = [Ve, Vx, Vy, Vt]
-                care_callee_Function = taintToethList[path[-2] - 1]
-                reentrancyFlag = self.traverseCFG_backwardProcess(taintFunctionNode.function, care_callee_Function.function)
+                care_callee_FunctionNode = taintToethList[path[-2] - 1]
+                reentrancyFlag = self.traverseCFG_backwardProcess(taintFunctionNode.function, care_callee_FunctionNode.function)
                 if reentrancyFlag is True:
                     tempPath = []
                     for i in path:
                         tempPath.append(taintToethList[i-1])
                     backwardDangerPath.append(tempPath)
+        backwardDangerPath = list(set([tuple(t) for t in backwardDangerPath]))
+        print('完成后向路径分析')
         return backwardDangerPath
 
     def forwardPath(self, functioncanEthNode, after_ethNodeList, callGraph):
@@ -188,14 +197,12 @@ class CgCfgReentrancy(AbstractDetector):
         '''
         print('开始进入前向路径分析')
         forwardDangerPaths= []  # [[Vt, Vx, Vy, Ve], ]
-        print('{}.{}'.format(functioncanEthNode, functioncanEthNode.function.full_name))
         # print('///////////////////')
         # for taintFunctionNode in callGraph.taintFunctionNodes:
         #     if functionNode is taintFunctionNode:
         #         print("qqqq")
         #     print('{}.{}'.format(taintFunctionNode, taintFunctionNode.function.full_name))
         for taintFunctionNode in callGraph.taintFunctionNodes:  # 拿到callgraph中所有的taintFunctionNode
-            print('{}.{}'.format(taintFunctionNode, taintFunctionNode.function.full_name))
             if functioncanEthNode is taintFunctionNode:
                 continue
             # print(taintFunctionNode.function.full_name)
@@ -205,9 +212,7 @@ class CgCfgReentrancy(AbstractDetector):
             ethToTaintList.extend(list(pilotProcessNodes))
             ethToTaintList.append(taintFunctionNode)    # [Vt, Vx, Vy, Ve]这样的顺序
             node_num = len(ethToTaintList)  # 其实是等于callGraph中的所有节点数量
-            for item in ethToTaintList:
-                print(item.function.full_name + " ", end="")
-            print("\n")
+
             #print(node_num)
             graph = MyGraph(node_num)   # 我的图算法类，用于计算有向图起点到终点的所有路径
             for functionNode in ethToTaintList[0:node_num-1]:   # index 范围【0:node_num-2】, 不去管终点的sons
@@ -215,11 +220,8 @@ class CgCfgReentrancy(AbstractDetector):
 
                     graph.addEdge(ethToTaintList.index(functionNode)+1, ethToTaintList.index(son)+1)    # 在构建邻接矩阵的时候要注意index+1!!
             # type list of list
-            print(graph.adjMat())
-            print(ethToTaintList.index(functionNode)+1)
             allPaths = graph.findAllPathBetweenTwoNodes(ethToTaintList.index(functioncanEthNode)+1, (len(ethToTaintList)-1)+1) #【Ve, Vt】之间的所有路径list of list
 
-            print(allPaths)
             for path in allPaths:   # allPath = [[Vt..Ve], [..], ]
                 care_callee_FunctionNode = ethToTaintList[path[-2]-1]  # ethToTaintList = [taint, fx, fy, fz, eth_function] 此时得到fz
 
@@ -230,7 +232,7 @@ class CgCfgReentrancy(AbstractDetector):
                     for i in path:
                         tempPath.append(ethToTaintList[i-1])
                     forwardDangerPaths.append(tempPath)
-
+        forwardDangerPaths = list(set([tuple(t) for t in forwardDangerPaths]))
         print('完成前向路径分析')
         return forwardDangerPaths  # [[dangerPath1], [dangerPath2], ...]
 
@@ -264,7 +266,7 @@ class CgCfgReentrancy(AbstractDetector):
             for external_call in node.high_level_calls:
                 external_contract, external_function = external_call
                 external_calls.append(external_function)
-            for call in set(internal_calls.expend(external_calls)):
+            for call in set(internal_calls + external_calls):
                 if isinstance(call, (Function)):
                     if call == calleeFunction:
                         node_callees.append(node)
