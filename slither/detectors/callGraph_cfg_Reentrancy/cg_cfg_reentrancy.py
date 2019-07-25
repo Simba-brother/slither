@@ -72,6 +72,7 @@ class CgCfgReentrancy(AbstractDetector):
                     if self._can_send_eth(node.irs):  # 如果这个节点可以发送eth
                         function.set_canEth(True)
                         eth_nodes.append(node)
+                function.ethNodes = eth_nodes
 
                         '''
                         if node.low_level_calls:            # 如果是LowLevelCall发送eth
