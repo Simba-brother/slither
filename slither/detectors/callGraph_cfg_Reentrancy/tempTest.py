@@ -19,7 +19,8 @@ def test():
 
 
 def test2():
-    a = [1,111,1]
-    a = list(set(a))
-    print(a)
+    a = [1, 2, 3]
+    b = [4, 5, 6]
+    for item in set(a) | set(b):
+        print(item)
 test2()

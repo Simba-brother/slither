@@ -87,9 +87,11 @@ slither/detectors/attributes/const_functions.py
 slither/detectors/attributes/constant_pragma.py
 slither/detectors/attributes/incorrect_solc.py
 slither/detectors/attributes/locked_ether.py
+slither/detectors/callGraph_cfg_Reentrancy/DM.py
 slither/detectors/callGraph_cfg_Reentrancy/Graph.py
 slither/detectors/callGraph_cfg_Reentrancy/__init__.py
 slither/detectors/callGraph_cfg_Reentrancy/cg_cfg_reentrancy.py
+slither/detectors/callGraph_cfg_Reentrancy/getAallPaths.py
 slither/detectors/callGraph_cfg_Reentrancy/tempTest.py
 slither/detectors/controlflowReentrancy/__init__.py
 slither/detectors/controlflowReentrancy/specificReen.py

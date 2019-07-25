@@ -5,7 +5,7 @@ from slither.slithir.variables.constant import Constant
 from slither.core.callGraph.CallGraph import CallGraph
 from slither.detectors.callGraph_cfg_Reentrancy.Graph import MyGraph
 from slither.core.declarations.function import Function
-
+from slither.detectors.callGraph_cfg_Reentrancy.DM import DM
 
 class CgCfgReentrancy(AbstractDetector):
     ARGUMENT = 'CgCfgReentrancy'
@@ -74,16 +74,6 @@ class CgCfgReentrancy(AbstractDetector):
                         eth_nodes.append(node)
                 function.ethNodes = eth_nodes
 
-                        '''
-                        if node.low_level_calls:            # 如果是LowLevelCall发送eth
-                            lowlevelCall_eth_Nodes.append(node)
-                            pass
-                        else:
-                            for ir in node.irs:
-                                if isinstance(ir, (Transfer, Send)):    # 如果是transfer or send发送eth
-                                    transferORsendNodes.append(node)
-                                    pass
-                        '''
                     # for ir in node.irs:
                     # if isinstance(ir, Transfer):
                     #     transferORsendNodes.append(node)
@@ -125,7 +115,9 @@ class CgCfgReentrancy(AbstractDetector):
                     else:
                         continue
                 if isReentrancy == True:  # 到这里这个函数的所有afterEthNode就遍历分析完了，如果为True。输出reentrance,然后分析下一个函数
-                    print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了'.format(function.contract.name, function.full_name))
+                    dm = DM(function)
+                    advanceUpdateFlag = dm.advancedUpdateEth(function)
+                    print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱更新：{}'.format(function.contract.name, function.full_name, advanceUpdateFlag))
                     continue  # 直接开始分析下一个函数
 
                 if not isReentrancy and function.canEth is True:  # 进行forward call graph

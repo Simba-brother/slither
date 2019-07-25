@@ -12,6 +12,15 @@ from slither.core.cfg.node import NodeType
 from slither.analyses.data_dependency.data_dependency import is_dependent
 
 
+def allPaths_intToNode(allPathsInt, startToEndNodes):
+    allPathsNode = []
+    for path in allPathsInt:
+        tempPath = []
+        for i in path:
+            tempPath.append(startToEndNodes[i-1])
+    allPathsNode.append(tempPath)
+    return allPathsNode
+
 
 class DM:
     def __init__(self, function):
@@ -23,18 +32,19 @@ class DM:
             entryPointToethNode = []
             entryPointToethNode.append(function.entry_point)
             pilotProcessNodes = list(set(allNodes) - set([function.entry_point, ethNode]))
-            entryPointToethNode.append(pilotProcessNodes)
+            entryPointToethNode.extend(pilotProcessNodes)
             entryPointToethNode.append(ethNode)
             allPaths = getAllPatth(entryPointToethNode)
-            for path in allPaths:
+            allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
+            for path in allPaths_Node:
                 careifNodeStack = []
                 care_if_StateVariablesRead = set()
                 care_RequireOrAssert_StateVariableRead = set()
                 state_variables_written = set()
                 for node in reversed(path):  # [start, end]
                     if node.contains_require_or_assert:
-                        care_RequireOrAssert_StateVariableRead |= node.state_variables_read
-                    state_variables_written |= node.state_variables_written
+                        care_RequireOrAssert_StateVariableRead |= set(node.state_variables_read)
+                    state_variables_written |= set(node.state_variables_written)
                     if node.type == NodeType.IF:
                         careifNodeStack.append(node)
                     if node.type == NodeType.ENDIF:
@@ -54,6 +64,7 @@ class DM:
                             result = is_dependent(stateVariableWritten, careStateVariableRead, function.contract)
                             if result == True:
                                 return True
+
         return False
 
 
