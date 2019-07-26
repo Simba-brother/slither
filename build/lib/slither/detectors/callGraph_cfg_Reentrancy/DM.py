@@ -67,6 +67,11 @@ class DM:
 
         return False
 
+    def privateVisibility(self, function):
+        if function.visibility == 'private':
+            return True
+        return False
+
 
 
 

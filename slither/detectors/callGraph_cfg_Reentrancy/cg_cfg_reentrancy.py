@@ -7,6 +7,17 @@ from slither.detectors.callGraph_cfg_Reentrancy.Graph import MyGraph
 from slither.core.declarations.function import Function
 from slither.detectors.callGraph_cfg_Reentrancy.DM import DM
 
+
+def callerVisibilityHavePublic(function, callGraph):
+    functionNode = callGraph.function_Map_node.get(function)
+    for father in functionNode.fathers:
+        if father.function.visibility == 'public':
+            return True
+        if callerVisibilityHavePublic(father, callGraph):
+            return True
+    return False
+
+
 class CgCfgReentrancy(AbstractDetector):
     ARGUMENT = 'CgCfgReentrancy'
     HELP = 'Benign reentrancy vulnerabilities'
@@ -59,9 +70,11 @@ class CgCfgReentrancy(AbstractDetector):
         for function in contract.functions:
             # callGraph.test(function)
             if function.is_implemented:
+                dm = DM(function)  # 准备DM
                 callPath = []
                 fatherFunctionLayerCount = 0  # 回溯调用记录的层数
                 eth_nodes = []  # 存储本函数含有转帐功能的cfg节点
+                advanceUpdateFlag = False
                 taint_nodes = []
                 isReentrancy = False  # False代表没有检测到reentrance
                 after_ethNodeList = []  # 用于存储转账节点的所有后续节点
@@ -100,32 +113,59 @@ class CgCfgReentrancy(AbstractDetector):
                 # 从after_ethNodeList列表中取出所有的节点（记为afterEthNode）, 然后进行调用链的分析
                 if after_ethNodeList:
                     print('开始分析 合约{}.函数{}'.format(function.contract.name, function.full_name))
+                directTaintReentrancy = False
                 for node_afterEthNode in after_ethNodeList:
-                    taintflag = False
+                    # taintflag = False
                     if node_afterEthNode.high_level_calls or node_afterEthNode.low_level_calls:
                         print('进行脏数据分析...')
                         for ir in node_afterEthNode.irs:
                             if hasattr(ir, 'destination'):
                                 result = is_tainted(ir.destination, node_afterEthNode.function.contract)
                                 if result == True:
-                                    taintflag = True
-                    if taintflag == True:
-                        isReentrancy = True
-                        break  # 如果只从本身分析就得到了reentrance结果, 就不用forward call graph了。
-                    else:
-                        continue
-                if isReentrancy == True:  # 到这里这个函数的所有afterEthNode就遍历分析完了，如果为True。输出reentrance,然后分析下一个函数
-                    dm = DM(function)
+                                    directTaintReentrancy = True
+                                    break
+                        if directTaintReentrancy == True:
+                            break
+                if directTaintReentrancy == True:   #待检测函数内部直接taint出Reentrancy
                     advanceUpdateFlag = dm.advancedUpdateEth(function)
-                    print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱更新：{}'.format(function.contract.name, function.full_name, advanceUpdateFlag))
-                    continue  # 直接开始分析下一个函数
+                    privateVisibility = dm.privateVisibility(function) # 检查function是否为private
+                    if privateVisibility is True:   # 如果function 可见性为private
+                        havePublicCaller = callerVisibilityHavePublic(function, callGraph)  # 看是否有public caller
+                        if havePublicCaller is True:    # 如果有publice caller
+                              # 钱是否提前更新/锁（本质是条件控制的全局变量是否提前更新）
+                            print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱提前更新/锁：{}, 可见性为private但存在public_Caller'.format(
+                                function.contract.name, function.full_name, advanceUpdateFlag))
+                            continue
+                    else:   # 如果function 可见性为public
+                        print(
+                            '{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱提前更新/锁：{}, 且可见性不是private'.format(
+                                function.contract.name, function.full_name, advanceUpdateFlag))
+                        continue
+                        # taintflag = True
+                    # if taintflag == True:
+                    #     isReentrancy = True
+                    #     break  # 如果只从本身分析就得到了reentrance结果, 就不用forward call graph了。
+                    # else:
+                    #     continue
+
+
+                # advanceUpdateFlag = dm.advancedUpdateEth(function)
+                # if isReentrancy == True:  # 到这里这个函数的所有afterEthNode就遍历分析完了，如果为True。输出reentrance,然后分析下一个函数
+                #     privateVisibility = dm.privateVisibility(function)
+                #     if privateVisibility is True:
+                #         havePublicCaller = callerVisibilityHavePublic(function, callGraph)
+                #         if havePublicCaller == False:
+                #             continue
+                #     print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱提前更新：{}, 可见性为private但存在public_Caller: {}'.format(function.contract.name, function.full_name, advanceUpdateFlag, privateVisibility))
+                #     continue  # 直接开始分析下一个函数
 
                 if not isReentrancy and function.canEth is True:  # 进行forward call graph
                     print(function.full_name, '可以传送eth,但自身函数体内没直接的reetrance的结构需要进行前向的call graph')
                     function_canEth_Node = callGraph.function_Map_node.get(function)   # 得到这个函数的节点
                     # print(function_canEth_Node.function.full_name)
                     forwardDangerPath = self.forwardPath(function_canEth_Node, after_ethNodeList, callGraph)
-                    if forwardDangerPath:   # [[Vt,...Ve], [dangerPath2], [], ...]
+                    if forwardDangerPath:   # [[Vt,...Ve], [dangerPath2], [], ...]  # 前向路径存在，准备DM
+                        advanceUpdateFlag = dm.advancedUpdateEth(function)
                         huamnlook_forwardDangerPath = []
                         for path in forwardDangerPath:
                             temp = []
@@ -133,17 +173,43 @@ class CgCfgReentrancy(AbstractDetector):
                                 temp.append(item.function.full_name)
                             huamnlook_forwardDangerPath.append(temp)
 
-                        print('{}.{} forward Reentrancy, Path:{}'.format(function.contract.name, function.full_name, huamnlook_forwardDangerPath))
-                        continue    #这个地方是否continue还得考虑
+                        privateVisibility = dm.privateVisibility(function)
+                        if privateVisibility is True:
+                            havePublicCaller = callerVisibilityHavePublic(function, callGraph)
+                            if havePublicCaller == True:
+                                print('{}.{} forward Reentrancy, Path:{}, 钱提前更新/锁：{}, 可见性为private(但存在public_Caller)'.format(function.contract.name, function.full_name, huamnlook_forwardDangerPath, advanceUpdateFlag))
+                                continue    #这个地方是否continue还得考虑
+                        else:
+                            print('{}.{} forward Reentrancy, Path:{}, 钱提前更新/锁：{}, 且可见性不是private'.format(
+                                function.contract.name, function.full_name, huamnlook_forwardDangerPath,
+                                advanceUpdateFlag))
+
                     backwardDangerPath = self.backwardPath(function_canEth_Node, callGraph)
-                    if backwardDangerPath:
-                        huamnlook_backwardDangerPath = []
-                        for path in backwardDangerPath:
-                            temp = []
-                            for item in path:
-                                temp.append(item.function.full_name)
-                            huamnlook_backwardDangerPath.append(temp)
-                        print('{}.{} backward Reentrancy, Path:{}'.format(function.contract.name, function.full_name, huamnlook_backwardDangerPath))
+                    if backwardDangerPath:  # [[Ve,...Vt], [dangerPath2], [], ...]  # 后向路径存在，准备DM
+                        afterDM_backwardDangerPaths = []
+                        dm.advancedUpdateEth(function)
+                        huamnlook_backwardDangerPaths = []
+
+                        for path in backwardDangerPath:  # 取出后向路径的每一条路径
+                            finallCaller = path[-1]
+                            finallCallerPrivateVisibility = dm.privateVisibility(finallCaller)
+                            if finallCallerPrivateVisibility is True:   # 如果最后的caller 是private
+                                havePublicCaller = callerVisibilityHavePublic(function, finallCaller)  # 判断finall caller是否有public caller
+                                if havePublicCaller is True:
+                                    afterDM_backwardDangerPaths.append(path)
+                            else:   # 如果最后的caller 是public
+                                afterDM_backwardDangerPaths.append(path)
+                            # temp = []
+                            # for item in path:
+                            #     temp.append(item.function.full_name)
+                            # huamnlook_backwardDangerPath.append(temp)
+                        for afterDM_backwardDangerPath in afterDM_backwardDangerPaths:
+                            temp_path = []
+                            for item in afterDM_backwardDangerPath:
+                                temp_path.append(item.full_name)
+                            huamnlook_backwardDangerPaths.append(temp_path)
+
+                        print('{}.{} backward Reentrancy, Path:{}'.format(function.contract.name, function.full_name, huamnlook_backwardDangerPaths))
 
     def backwardPath(self, functioncanEthNode, callGraph):
         '''
