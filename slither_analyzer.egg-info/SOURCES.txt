@@ -82,6 +82,11 @@ slither/core/variables/variable.py
 slither/detectors/__init__.py
 slither/detectors/abstract_detector.py
 slither/detectors/all_detectors.py
+slither/detectors/ICFG_Reentrancy/ICFGreentrancy.py
+slither/detectors/ICFG_Reentrancy/__init__.py
+slither/detectors/ICFG_Reentrancy/smallUtils.py
+slither/detectors/ICFG_Reentrancy/icfg/ICFG.py
+slither/detectors/ICFG_Reentrancy/icfg/__init__.py
 slither/detectors/attributes/__init__.py
 slither/detectors/attributes/const_functions.py
 slither/detectors/attributes/constant_pragma.py

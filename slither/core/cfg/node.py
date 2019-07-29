@@ -107,8 +107,13 @@ def link_nodes(n1, n2):
     n1.add_son(n2)
     n2.add_father(n1)
 
+def link_icfgNodes(n1, n2):
+    n1.add_icfgSon(n2)
+    n2.add_icfgFather(n1)
 
-
+def link_backIcfgNodes(n1, n2):
+    n1.add_backIcfgSon(n2)
+    n1.add_backIcfgFather(n1)
 # endregion
 
 class Node(SourceMapping, ChildFunction):
@@ -124,7 +129,13 @@ class Node(SourceMapping, ChildFunction):
         # TODO: rename to explicit CFG 
         self._sons = []
         self._fathers = []
+        self._icfgSons = []
+        self._icfgFathers = []
 
+        self._backIcfgSons = []
+        self._backIcfgFathers = []
+
+        self.isEND = False  # 马明亮加的
         ## Dominators info
         # Dominators nodes
         self._dominators = set()
@@ -396,7 +407,7 @@ class Node(SourceMapping, ChildFunction):
         return self._expression
 
     def add_expression(self, expression):
-        assert self._expression is None
+        # assert self._expression is None
         self._expression = expression
 
     def add_variable_declaration(self, var):
@@ -465,7 +476,9 @@ class Node(SourceMapping, ChildFunction):
     # region Graph
     ###################################################################################
     ###################################################################################
-
+    '''
+    添加各种爸爸们
+    '''
     def add_father(self, father):
         """ Add a father node
 
@@ -473,6 +486,14 @@ class Node(SourceMapping, ChildFunction):
             father: father to add
         """
         self._fathers.append(father)
+
+    def add_icfgFather(self, father):
+        self._icfgFathers.append(father)
+
+    def add_backIcfgFather(self, father):
+        self._backIcfgFathers.append(father)
+
+
 
     def set_fathers(self, fathers):
         """ Set the father nodes
@@ -482,6 +503,10 @@ class Node(SourceMapping, ChildFunction):
         """
         self._fathers = fathers
 
+
+    '''
+    属性方法，get各种爸爸们
+    '''
     @property
     def fathers(self):
         """ Returns the father nodes
@@ -490,6 +515,16 @@ class Node(SourceMapping, ChildFunction):
             list(Node): list of fathers
         """
         return list(self._fathers)
+
+    @property
+    def icfgFathers(self):
+        return list(self._icfgFathers)
+
+    @property
+    def backIcfgFathers(self):
+        return list(self._backIcfgFathers)
+
+
 
     def remove_father(self, father):
         """ Remove the father node. Do nothing if the node is not a father
@@ -507,6 +542,9 @@ class Node(SourceMapping, ChildFunction):
         """
         self._sons = [x for x in self._sons if x.node_id != son.node_id]
 
+    '''
+    添加各种儿子们
+    '''
     def add_son(self, son):
         """ Add a son node
 
@@ -515,6 +553,15 @@ class Node(SourceMapping, ChildFunction):
         """
         self._sons.append(son)
 
+    def add_icfgSon(self, son):
+        self._icfgSons.append(son)
+
+    def add_backIcfgSon(self, son):
+        self._backIcfgSons.append(son)
+
+    '''
+    批量设置各种儿子们
+    '''
     def set_sons(self, sons):
         """ Set the son nodes
 
@@ -523,6 +570,13 @@ class Node(SourceMapping, ChildFunction):
         """
         self._sons = sons
 
+    def set_backIcfgSons(self, sons):   # sons是list
+        self._backIcfgSons = sons
+
+
+    '''
+    属性方法，get各种儿子们
+    '''
     @property
     def sons(self):
         """ Returns the son nodes
@@ -531,6 +585,14 @@ class Node(SourceMapping, ChildFunction):
             list(Node): list of sons
         """
         return list(self._sons)
+    @property
+    def icfgSons(self):
+        return list(self._icfgSons)
+
+    @property
+    def backIcfgSons(self):
+        return list(self._backIcfgSons)
+
 
     # endregion
     ###################################################################################
@@ -706,7 +768,7 @@ class Node(SourceMapping, ChildFunction):
             if isinstance(ir, SolidityCall):
                 # TODO: consider removing dependancy of solidity_call to internal_call
                 self._solidity_calls.append(ir.function)
-                self._internal_calls.append(ir.function)
+                # self._internal_calls.append(ir.function)
             if isinstance(ir, LowLevelCall):
                 assert isinstance(ir.destination, (Variable, SolidityVariable))
                 self._low_level_calls.append((ir.destination, ir.function_name.value))
@@ -722,7 +784,7 @@ class Node(SourceMapping, ChildFunction):
                         raise SlitherException(f'Function not found on {ir}. Please try compiling with a recent Solidity version.')
             elif isinstance(ir, LibraryCall):
                 assert isinstance(ir.destination, Contract)
-                self._high_level_calls.append((ir.destination, ir.function))
+                # self._high_level_calls.append((ir.destination, ir.function))
                 self._library_calls.append((ir.destination, ir.function))
 
         self._vars_read = list(set(self._vars_read))

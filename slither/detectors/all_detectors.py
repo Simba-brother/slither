@@ -40,5 +40,6 @@ from .controlflowReentrancy.specificReen import SpcificReen
 from .taintAnalyzer.testTaint import TestTaint
 from .testCallGraph.testCallgraph import TestCallGraph
 from .callGraph_cfg_Reentrancy.cg_cfg_reentrancy import CgCfgReentrancy
+from .ICFG_Reentrancy.ICFGreentrancy import ICfgReentrancy
 #
 #

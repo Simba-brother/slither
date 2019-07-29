@@ -7,7 +7,7 @@ from slither.slithir.operations import (HighLevelCall, LowLevelCall,
                                         LibraryCall,
                                         Send, Transfer)
 from slither.core.variables.variable import Variable
-from slither.detectors.callGraph_cfg_Reentrancy.getAallPaths import getAllPatth
+from slither.detectors.callGraph_cfg_Reentrancy.getAallPaths import getCfgAllPath
 from slither.core.cfg.node import NodeType
 from slither.analyses.data_dependency.data_dependency import is_dependent
 
@@ -18,7 +18,7 @@ def allPaths_intToNode(allPathsInt, startToEndNodes):
         tempPath = []
         for i in path:
             tempPath.append(startToEndNodes[i-1])
-    allPathsNode.append(tempPath)
+        allPathsNode.append(tempPath)
     return allPathsNode
 
 
@@ -34,7 +34,7 @@ class DM:
             pilotProcessNodes = list(set(allNodes) - set([function.entry_point, ethNode]))
             entryPointToethNode.extend(pilotProcessNodes)
             entryPointToethNode.append(ethNode)
-            allPaths = getAllPatth(entryPointToethNode)
+            allPaths = getCfgAllPath(entryPointToethNode)
             allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
             for path in allPaths_Node:
                 careifNodeStack = []

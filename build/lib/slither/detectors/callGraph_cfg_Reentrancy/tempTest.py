@@ -1,13 +1,16 @@
 from slither.detectors.callGraph_cfg_Reentrancy.Graph import MyGraph
+
 def test():
-    graph = MyGraph(12)
-    lian = [[0, 1], [1, 2], [1, 3], [1, 4], [2, 5], [2, 6], [3, 11], [4, 11], [5, 7], [5, 8], [6, 9], [6, 10], [7, 11], [8, 11], [9, 11]]
+    graph = MyGraph(7)
+    lian = [[0, 1], [1, 4], [4, 5], [5, 1], [4, 6]]
     for item in lian:
         graph.addEdge(item[0]+1, item[1]+1)
     for gitem in graph.adjMat():
         print(gitem)
 
-    graph.findAllPathBetweenTwoNodes(1, 12)
+    allPaths = graph.findAllPathBetweenTwoNodes(1, 7)
+    for path in allPaths:
+        print(path)
     # a = [[0] * 3for i in range(4)]
     # print(a)
     # print(set([1,3]))
@@ -16,11 +19,15 @@ def test():
     # a.add(5)
     # print(a)
 #test()
-
-
+import copy
+class C:
+    def __init__(self):
+        self.age = 18
+class A:
+    def __init__(self):
+        self.num = 10
+        self.c = C()
 def test2():
-    a = [1, 2, 3]
-    b = [4, 5, 6]
-    for item in set(a) | set(b):
-        print(item)
+    a = []
+    print(a == None)
 test2()

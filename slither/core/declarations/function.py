@@ -26,7 +26,9 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
 
     def __init__(self):
         super(Function, self).__init__()
+        self.ENDnodes = []  # 马明亮加的
         self.taintNodes = []
+        self.directTaintNodes = []
         self._name = None
         self._view = None
         self._pure = None
@@ -802,7 +804,7 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
 
     def all_solidity_variables_used_as_args(self):
         """
-            Return the Soldiity variables directly used in a call
+            Return the Solidity variables directly used in a call
 
             Use of the IR to filter index access
             Used to catch check(msg.sender)
@@ -989,9 +991,9 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
             (bool)
         """
 
-        if self.is_constructor:
+        if self.is_constructor:  # 如果这个函数是构造器那么直接定义该函数被保护
             return True
-        conditional_vars = self.all_conditional_solidity_variables_read(include_loop=False)
+        conditional_vars = self.all_conditional_solidity_variables_read(include_loop=False)  # 得到这个函数中条件里面所读取的所有solidityVariables
         args_vars = self.all_solidity_variables_used_as_args()
         return SolidityVariableComposed('msg.sender') in conditional_vars + args_vars
 

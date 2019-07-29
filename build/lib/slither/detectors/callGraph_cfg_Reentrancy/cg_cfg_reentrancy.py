@@ -6,8 +6,8 @@ from slither.core.callGraph.CallGraph import CallGraph
 from slither.detectors.callGraph_cfg_Reentrancy.Graph import MyGraph
 from slither.core.declarations.function import Function
 from slither.detectors.callGraph_cfg_Reentrancy.DM import DM
-
-
+from slither.detectors.callGraph_cfg_Reentrancy.getAallPaths import getCfgAllPath
+from slither.detectors.callGraph_cfg_Reentrancy.DM import allPaths_intToNode
 def callerVisibilityHavePublic(function, callGraph):
     functionNode = callGraph.function_Map_node.get(function)
     for father in functionNode.fathers:
@@ -46,12 +46,12 @@ class CgCfgReentrancy(AbstractDetector):
 
     def _detect(self):
         callGraph = CallGraph(self.slither)   # 得到.sol文件的call_graph(internalcall 和 externalcall糅杂在一起)
-
+        dangerFunctionList = set()
         for c in self.contracts:
-            self.detect_reentrancy(c, callGraph)
+            self.detect_reentrancy(c, callGraph, dangerFunctionList)
         return []
 
-    def detect_reentrancy(self, contract, callGraph):
+    def detect_reentrancy(self, contract, callGraph, dangerFunctionList):
         '''
         得到taintFunctionNode 对应 的function得到function所有的taintNode,append到taintFunction.taintNodes属性中
         '''
@@ -64,7 +64,7 @@ class CgCfgReentrancy(AbstractDetector):
                                 taintflag = is_tainted(ir.destination, node.function.contract)
                                 if taintflag:
                                     taintFunction.taintNodes.append(node)
-
+                                    taintFunction.directTaintNodes.append(node)
 
 
         for function in contract.functions:
@@ -105,6 +105,43 @@ class CgCfgReentrancy(AbstractDetector):
                 if function.canEth == False:
                     print('合约{}.函数{} 不含有直接转张功能,跳过此函数的分析'.format(function.contract.name, function.full_name))
                     continue
+
+                for eth_cfg_node in eth_nodes:
+                    for taint_cfg_Node in function.directTaintNodes:  # function.directTaintNodes ！！！
+                        ethCFGnode_To_taintCFGnode = []
+                        ethCFGnode_To_taintCFGnode.append(eth_cfg_node)
+                        ethCFGnode_To_taintCFGnode.extend(list(set(function.nodes) - set([eth_cfg_node, taint_cfg_Node])))
+                        ethCFGnode_To_taintCFGnode.append(taint_cfg_Node)
+                        allPaths = getCfgAllPath(ethCFGnode_To_taintCFGnode)
+                        allPathsNode = allPaths_intToNode(allPaths, ethCFGnode_To_taintCFGnode)
+                        if allPathsNode:    # 如果当前eth_node 和 当前taintNode之间至少有一条路径
+                            advanceUpdateFlag = dm.advancedUpdateEth(function)
+                            human_allPathsNode = []
+                            for path in allPathsNode:
+                                temp = []
+                                for node in reversed(path):
+                                    temp.append(str(node.expression))
+                                human_allPathsNode.append(temp)
+                            privateVisibility = dm.privateVisibility(function)  # 检查function是否为private
+
+                            if privateVisibility is True:  # 如果function 可见性为private
+                                havePublicCaller = callerVisibilityHavePublic(function, callGraph)  # 看是否有public caller
+                                if havePublicCaller is True:
+                                    isReentrancy = True
+                                    print(
+                                        '合约{}.函数{}: 本身就有Reentrancy路径结构 | 可见性是private但有publicCaller | 钱更新/锁: {} | paths: {}'.format(
+                                            function.contract.name, function.full_name, privateVisibility,
+                                            advanceUpdateFlag, havePublicCaller, human_allPathsNode))
+                            else:
+                                isReentrancy = True
+                                print(
+                                    '合约{}.函数{}: 本身就有Reentrancy路径结构 | 且可见性是public | 钱更新/锁: {} | paths: {}'.format(
+                                        function.contract.name, function.full_name,
+                                        advanceUpdateFlag, human_allPathsNode))
+                if isReentrancy is True:
+                    print('合约{}.函数{}: 是个危险函数!'.format(function.contract.name, function.full_name))
+                    continue
+                '''
                 for eth_node in eth_nodes:
                     after_ethNodeList.append(
                         eth_node)  # ！！！在得到传送eth节点的所有后续节点列表之前，先把负责传送eth节点的本身添加进来，因为.call.value()类型的node本身也是外部调用！！！
@@ -158,7 +195,7 @@ class CgCfgReentrancy(AbstractDetector):
                 #             continue
                 #     print('{}.{} 从本身分析就得到了reentrance结果, 就不用forward call graph了, 钱提前更新：{}, 可见性为private但存在public_Caller: {}'.format(function.contract.name, function.full_name, advanceUpdateFlag, privateVisibility))
                 #     continue  # 直接开始分析下一个函数
-
+                '''
                 if not isReentrancy and function.canEth is True:  # 进行forward call graph
                     print(function.full_name, '可以传送eth,但自身函数体内没直接的reetrance的结构需要进行前向的call graph')
                     function_canEth_Node = callGraph.function_Map_node.get(function)   # 得到这个函数的节点
@@ -169,7 +206,7 @@ class CgCfgReentrancy(AbstractDetector):
                         huamnlook_forwardDangerPath = []
                         for path in forwardDangerPath:
                             temp = []
-                            for item in path:
+                            for item in reversed(path):
                                 temp.append(item.function.full_name)
                             huamnlook_forwardDangerPath.append(temp)
 
@@ -177,17 +214,24 @@ class CgCfgReentrancy(AbstractDetector):
                         if privateVisibility is True:
                             havePublicCaller = callerVisibilityHavePublic(function, callGraph)
                             if havePublicCaller == True:
-                                print('{}.{} forward Reentrancy, Path:{}, 钱提前更新/锁：{}, 可见性为private(但存在public_Caller)'.format(function.contract.name, function.full_name, huamnlook_forwardDangerPath, advanceUpdateFlag))
+                                isReentrancy = True
+                                print('合约{}.函数{} forward Reentrancy | 可见性是private但有publicCaller | 钱更新/锁: {} | paths: {}'.format(function.contract.name, function.full_name, advanceUpdateFlag, huamnlook_forwardDangerPath))
                                 continue    #这个地方是否continue还得考虑
                         else:
-                            print('{}.{} forward Reentrancy, Path:{}, 钱提前更新/锁：{}, 且可见性不是private'.format(
-                                function.contract.name, function.full_name, huamnlook_forwardDangerPath,
-                                advanceUpdateFlag))
+                            isReentrancy = True
+                            print('合约{}.函数{} forwardReentrancy | 且可见性是public | 钱更新/锁: {} | paths: {}e'.format(
+                                function.contract.name, function.full_name, advanceUpdateFlag,
+                                huamnlook_forwardDangerPath))
+                            continue
+                    if isReentrancy is True:
+                        print('合约{}.函数{}: 是个危险函数!'.format(function.contract.name, function.full_name))
+                        continue
 
                     backwardDangerPath = self.backwardPath(function_canEth_Node, callGraph)
                     if backwardDangerPath:  # [[Ve,...Vt], [dangerPath2], [], ...]  # 后向路径存在，准备DM
+
                         afterDM_backwardDangerPaths = []
-                        dm.advancedUpdateEth(function)
+                        advanceUpdateFlag = dm.advancedUpdateEth(function)
                         huamnlook_backwardDangerPaths = []
 
                         for path in backwardDangerPath:  # 取出后向路径的每一条路径
@@ -203,13 +247,22 @@ class CgCfgReentrancy(AbstractDetector):
                             # for item in path:
                             #     temp.append(item.function.full_name)
                             # huamnlook_backwardDangerPath.append(temp)
-                        for afterDM_backwardDangerPath in afterDM_backwardDangerPaths:
-                            temp_path = []
-                            for item in afterDM_backwardDangerPath:
-                                temp_path.append(item.full_name)
-                            huamnlook_backwardDangerPaths.append(temp_path)
-
-                        print('{}.{} backward Reentrancy, Path:{}'.format(function.contract.name, function.full_name, huamnlook_backwardDangerPaths))
+                        if afterDM_backwardDangerPaths:
+                            isReentrancy = True
+                            for afterDM_backwardDangerPath in afterDM_backwardDangerPaths:
+                                temp_path = []
+                                for item in reversed(afterDM_backwardDangerPath):
+                                    temp_path.append(item.full_name)
+                                huamnlook_backwardDangerPaths.append(temp_path)
+                            print('合约{}.函数{} backwardReentrancy | 钱更新/锁: {} | Path:{}'.format(function.contract.name, function.full_name, advanceUpdateFlag, huamnlook_backwardDangerPaths))
+                    if isReentrancy is True:
+                        benci_dangerFunctionList = set()
+                        for path in huamnlook_backwardDangerPaths:
+                            if path[-1] not in dangerFunctionList:
+                                benci_dangerFunctionList.add(path[-1])
+                        for dangerFunction in benci_dangerFunctionList:
+                            print('合约{}.函数{} 是一个危险函数'.format(dangerFunction.contract.name, dangerFunction.full_name))
+                        continue
 
     def backwardPath(self, functioncanEthNode, callGraph):
         '''
