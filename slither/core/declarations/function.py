@@ -249,6 +249,9 @@ class Function(ChildContract, ChildInheritance, SourceMapping):
         """
         return list(self._nodes)
 
+    def addNode(self, newNode):  # 我加的
+        self._nodes.append(newNode)
+
     @property
     def entry_point(self):
         """

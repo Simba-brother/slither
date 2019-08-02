@@ -13,13 +13,15 @@ class FunctionNode(SourceMapping, ChildContract):
         self._fathers = []
         self._function = function
         self._taint = False
+        self._eth = False
     @property
     def tiant(self):
         return self._taint
 
     def setTaint(self, taint):
         self._taint = taint
-
+    def setEth(self, eth):
+        self._eth = eth
     @property
     def function(self):
         return self._function

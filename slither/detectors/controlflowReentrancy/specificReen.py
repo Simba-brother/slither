@@ -47,8 +47,8 @@ class SpcificReen(AbstractDetector):
         self.visited_all_paths = {}
 
         for c in self.contracts:
-            # self.isTaint(c);
-            self.detect_reentrancy(c)
+            self.isTaint(c);
+            # self.detect_reentrancy(c)
 
         return []
     def detect_reentrancy(self, contract):
@@ -398,18 +398,18 @@ class SpcificReen(AbstractDetector):
                     return True
         return False
 
-    # def isTaint(self, contract):
-    #     for function in contract.functions_and_modifiers_declared:
-    #        # print('{} -> {}'.format(type(function.visibility), function.visibility))
-    #        if function.visibility in ['public', 'external']:
-    #            for node in function.nodes:
-    #                taintRes = False
-    #                if node.high_level_calls or node.low_level_calls:
-    #                    for ir in node.irs:
-    #                        if hasattr(ir, 'destination'):
-    #                            taintRes = is_tainted(ir.destination, function.contract)
-    #                            print('Function: {} dest: {}  isTaint {}'.format(function.full_name, ir.destination, taintRes))
-    #
+    def isTaint(self, contract):
+        for function in contract.functions_and_modifiers_declared:
+           # print('{} -> {}'.format(type(function.visibility), function.visibility))
+           #if function.visibility in ['public', 'external']:
+           for node in function.nodes:
+               taintRes = False
+               if node.high_level_calls or node.low_level_calls:
+                   for ir in node.irs:
+                       if hasattr(ir, 'destination'):
+                           taintRes = is_tainted(ir.destination, function.contract)
+                           print('Function: {} dest: {}  isTaint {}'.format(function.full_name, ir.destination, taintRes))
+
 
 
          

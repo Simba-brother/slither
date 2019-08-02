@@ -17,7 +17,7 @@ def allPaths_intToNode(allPathsInt, startToEndNodes):
     for path in allPathsInt:
         tempPath = []
         for i in path:
-            tempPath.append(startToEndNodes[i-1])
+            tempPath.append(startToEndNodes[i])  # 原来是有-1的
         allPathsNode.append(tempPath)
     return allPathsNode
 
@@ -29,11 +29,13 @@ class DM:
     def advancedUpdateEth(self, function):
         allNodes = function.nodes
         for ethNode in function.ethNodes:
+
             entryPointToethNode = []
             entryPointToethNode.append(function.entry_point)
             pilotProcessNodes = list(set(allNodes) - set([function.entry_point, ethNode]))
             entryPointToethNode.extend(pilotProcessNodes)
             entryPointToethNode.append(ethNode)
+
             allPaths = getCfgAllPath(entryPointToethNode)
             allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
             for path in allPaths_Node:

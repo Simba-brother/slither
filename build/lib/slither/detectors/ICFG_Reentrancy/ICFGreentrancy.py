@@ -13,6 +13,8 @@ from slither.detectors.ICFG_Reentrancy.icfg.ICFG import ICFG
 import copy
 from slither.detectors.callGraph_cfg_Reentrancy.DM import allPaths_intToNode
 from slither.core.callGraph.CallGraph import CallGraph
+from slither.detectors.ICFG_Reentrancy.smallUtils import (getadjMatrix, getICFGadjMatrix)
+from slither.detectors.ICFG_Reentrancy.testDFS import MyDeepGraph
 
 def callerVisibilityHavePublic(function, callGraph):
     functionNode = callGraph.function_Map_node.get(function)
@@ -56,73 +58,90 @@ class ICfgReentrancy(AbstractDetector):
     WIKI_RECOMMENDATION = 'Apply the [check-effects-interactions pattern](http://solidity.readthedocs.io/en/v0.4.21/security-considerations.html#re-entrancy).'
 
     def _detect(self):
-        ethNodeList, taintNodeList, cfgEndNodeList = self.getAllEthNode_AllTaintNode()
-        callGraph = CallGraph(self.slither)
         icfg = ICFG(self.slither)
         icfg.build_ICFG()
+        ethNodeList, taintNodeList, cfgEndNodeList = self.getAllEthNode_AllTaintNode()
+        callGraph = CallGraph(self.slither)
+
+
         for c in self.contracts:
             self.detect_reentrancy(c, ethNodeList, taintNodeList, icfg, callGraph, cfgEndNodeList)
         return []
 
     def detect_reentrancy(self, contract, ethNodeList, taintNodeList, icfg, callGraph, cfgEndNodeList):
+        print('Start Contract {}'.format(contract.name))
         for function in contract.functions:
             if function.is_implemented:
-                print('\n')
-                print('To analyze：{}.{}'.format(function.contract.name, function.full_name))
-                dm = DM(function)
+                print('\tTo analyze：{}.{}'.format(function.contract.name, function.full_name))
+                dm = DM(function)   # 声明dm防御对象
                 reentrancyFlag = False
-                functon_taintNodeList = []
+
+                functon_taintNodeList = []  # 存储本函数体内的taint
                 for node in function.nodes:
                     if node in taintNodeList:
                         functon_taintNodeList.append(node)
-                for function_taintNode in functon_taintNodeList:
 
+                for function_taintNode in functon_taintNodeList:
+                    '''
+                    startToend = [start, ... ,end]
+                    '''
                     cfgEntryNodeTotaint = []
                     cfgEntryNodeTotaint.append(function.entry_point)
                     cfgEntryNodeTotaint.extend(list(set(function.nodes) - set([function.entry_point, function_taintNode])))
                     cfgEntryNodeTotaint.append(function_taintNode)
 
-                    cfgAllPath = getCfgAllPath(cfgEntryNodeTotaint)
+                    # cfgAllPath = getCfgAllPath(cfgEntryNodeTotaint)
+                    adjMatrix = getadjMatrix(cfgEntryNodeTotaint)
+                    mydeepGraph = MyDeepGraph(len(cfgEntryNodeTotaint))
+                    mydeepGraph.setadjMetrix(adjMatrix)
+                    cfgAllPath = mydeepGraph.getPathofTwoNode(0, len(cfgEntryNodeTotaint)-1)
                     cfgAllPath_Node = allPaths_intToNode(cfgAllPath, cfgEntryNodeTotaint)
+
                     cfgCandidateAllPath_Node = []
                     for path in cfgAllPath_Node[:]:
                        if any(iNode in ethNodeList for iNode in path):
                            cfgCandidateAllPath_Node.append(path)
+
                     if cfgCandidateAllPath_Node:   # 证明cfg本身就找到Reentrancy了，准备humanlook, 注意reversed, DM
+
                         human_cfgCandidateAllPath_Node = []
                         for path in cfgCandidateAllPath_Node:
                             tempPath = []
-                            for everyNode in reversed(path):
+                            for everyNode in path:
                                 if everyNode.type == NodeType.ENTRYPOINT:
                                     everyNode.add_expression('entryPoint')
                                 tempPath.append(str(everyNode.expression))
                             human_cfgCandidateAllPath_Node.append(tempPath)
-                        advanceUpdateFlag = dm.advancedUpdateEth(function)
+                        advanceUpdateFlag = False  # dm.advancedUpdateEth(function)
                         privateVisibility = dm.privateVisibility(function)
                         havePublicCaller = callerVisibilityHavePublic(function, callGraph)
                         if privateVisibility is True:
                             if havePublicCaller is True:
                                 reentrancyFlag = True
-                                print('\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
+                                print('\t\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
                                     function.contract.name, function.full_name, privateVisibility, havePublicCaller, advanceUpdateFlag))
                                 for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
-                                    print('\t\tpath: {}'.format(human_cfgCandidatePath_Node))
+                                    print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                         else:
                             reentrancyFlag = True
                             print(
-                                '\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
+                                '\t\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
                                     function.contract.name, function.full_name, privateVisibility, advanceUpdateFlag))
                             for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
-                                print('\t\tpath: {}'.format(human_cfgCandidatePath_Node))
+                                print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                 if reentrancyFlag is True:
                     print('[cfg_Reentrancy in] contract: {} . function: {} | {}'.format(function.contract.name, function.full_name, function.source_mapping_str))
                     continue
 
+
                 if reentrancyFlag is False:  # 证明cfg本身没找到Reentrancy
                     '''
-                    bug修复为了把当前的function的endnode的回调用处的那条路径删除
+                    bug修复为了把当前的function的endnode的回调用处的那条路径删除，同时也要删除本函数entryNode的icfgFather
                     '''
-                    print('\tcfg分析安全，所以开始ICFG的分析'.format(function.full_name))
+                    print('\t\tcfg分析安全，所以开始ICFG的分析'.format(function.full_name))
+                    # = function.entry_point.icfgFathers
+                    # function.entry_point.set_icfgFather([])
+                    '''
                     endnodeMapBackSons = {}
                     # hh = [str(endnode.expression) for endnode in function.ENDnodes]
                     # print('结束点：'.format(hh))
@@ -133,7 +152,7 @@ class ICfgReentrancy(AbstractDetector):
 
                     for endnode in function.ENDnodes:
                         endnode.set_backIcfgSons([])
-
+                    '''
                     # tt = [str(taintNode.expression) for taintNode in taintNodeList]
                     # print('系统中所有的taint：{}, 总共有 {} 个taintNode'.format(tt, len(taintNodeList)))
                     # for endnode in function.ENDnodes:
@@ -146,17 +165,26 @@ class ICfgReentrancy(AbstractDetector):
                         icfgEntryNodeTotaint.extend(list(set(icfg.allNodes) - set([function.entry_point, taintNode])))
                         icfgEntryNodeTotaint.append(taintNode)
 
-                        icfgAllPath = getIcfgAllPath(icfgEntryNodeTotaint)
-                        # print('函数{}的入口点到taint点{}的路径有{}条：'.format(function.full_name, taintNode.expression, len(icfgAllPath)))
+                        adjMatrix = getICFGadjMatrix(icfgEntryNodeTotaint)
+
+                        mydeepGraph = MyDeepGraph(len(icfgEntryNodeTotaint))
+                        mydeepGraph.setadjMetrix(adjMatrix)
+                        #mydeepGraph.printMatrix()
+                        icfgAllPath = mydeepGraph.getPathofTwoNode(0, len(icfgEntryNodeTotaint) - 1)
+
                         icfgAllPath_Node = allPaths_intToNode(icfgAllPath, icfgEntryNodeTotaint)
+
+                        #icfgAllPath = getIcfgAllPath(icfgEntryNodeTotaint)
+                        # print('函数{}的入口点到taint点{}的路径有{}条：'.format(function.full_name, taintNode.expression, len(icfgAllPath)))
+                        #icfgAllPath_Node = allPaths_intToNode(icfgAllPath, icfgEntryNodeTotaint)
                         # print('应该为1：{}'.format(len(icfgAllPath_Node)))
                         # qq = [[str(ww.expression) for ww in yy] for yy in icfgAllPath_Node]
                         # print('路径：{}'.format(qq))
-                        icfgCandidateAllPaht_Node = []
+                        icfgCandidateAllPath_Node = []
 
                         for path in icfgAllPath_Node:
-                            if any(itemNode in ethNodeList for itemNode in path):
-                                icfgCandidateAllPaht_Node.append(path)
+                            if any(iNode in ethNodeList for iNode in path):
+                                icfgCandidateAllPath_Node.append(path)
 
                         # if icfgCandidateAllPaht_Node:
                         #     # 检查icfg路径合法性
@@ -180,15 +208,16 @@ class ICfgReentrancy(AbstractDetector):
                         #                 if path[-1] != node:
                         #                     # 非法路径
                         #                     pass
-                        if icfgCandidateAllPaht_Node:    # 证明icfg本身找到Reentrancy了，准备humanlook, DM
+                        if icfgCandidateAllPath_Node:    # 证明icfg本身找到Reentrancy了，准备humanlook, DM
+
                             # print('证明icfg本身找到Reentrancy了，准备humanlook, DM')
                             '''
                             转变成普通人能看懂的形式，注意reversed
                             '''
                             human_icfgCandidateAllPath_Node = []
-                            for path in icfgCandidateAllPaht_Node:
+                            for path in icfgCandidateAllPath_Node:
                                 tempPath = []
-                                for everyNode in reversed(path):
+                                for everyNode in path:
                                     if everyNode.type == NodeType.ENTRYPOINT:
                                         everyNode.add_expression('entryPoint')
                                     tempPath.append(str(everyNode.expression))
@@ -198,15 +227,18 @@ class ICfgReentrancy(AbstractDetector):
                             #     for itemNode in path:
                             #         if itemNode in ethNodeList:
                             #             etherNodesInPath.append(itemNode)
-                            etherNodesInPath = [itemNode for path in icfgCandidateAllPaht_Node for itemNode in path if itemNode in ethNodeList]
+                            etherNodesInPath = [itemNode for path in icfgCandidateAllPath_Node for itemNode in path if itemNode in ethNodeList]
                             # print('长度：{}'.format(len(etherNodesInPath)))
                             # kkk = [str(etherNodeInPath.expression) for etherNodeInPath in etherNodesInPath]
                             # print('在路径中的转账节点：{}'.format(kkk))
                             realETHfunctionList = [eNode.function for eNode in etherNodesInPath]
+                            '''
                             if all(dm.advancedUpdateEth(function) for function in realETHfunctionList):
                                 advanceUpdateFlag = True
                             else:
                                 advanceUpdateFlag = False
+                            '''
+                            advanceUpdateFlag = False
                             #advanceUpdateFlag = dm.advancedUpdateEth(function)
                             privateVisibility = dm.privateVisibility(function)
                             havePublicCaller = callerVisibilityHavePublic(function, callGraph)
@@ -215,25 +247,29 @@ class ICfgReentrancy(AbstractDetector):
                                 if havePublicCaller is True:
                                     reentrancyFlag = True
                                     print(
-                                        '\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
+                                        '\t\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
                                             function.contract.name, function.full_name, privateVisibility, havePublicCaller, advanceUpdateFlag))
                                     for human_icfgCandidatePath_Node in human_icfgCandidateAllPath_Node:
-                                        print('\t\tpath: {}'.format(human_icfgCandidatePath_Node))
+                                        print('\t\t\tpath: {}'.format(human_icfgCandidatePath_Node))
                             else:
                                 reentrancyFlag = True
                                 print(
-                                    '\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
+                                    '\t\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
                                         function.contract.name, function.full_name, privateVisibility, advanceUpdateFlag))
                                 for human_icfgCandidatePath_Node in human_icfgCandidateAllPath_Node:
-                                    print('\t\tpath: {}'.format(human_icfgCandidatePath_Node))
+                                    print('\t\t\tpath: {}'.format(human_icfgCandidatePath_Node))
+                    '''
+                    为了把当前的function的endnode的回调用处的那条路径再补上, 和entryNode的icfgFather叶去掉
+                    '''
+                    # if endnodeMapBackSons:
+                    #     for endnode in function.ENDnodes:
+                    #         endnode.set_backIcfgSons = endnodeMapBackSons[endnode]
+                    #function.entry_point.set_icfgFather = icfgFathersNeedToDuan
                 if reentrancyFlag is True:
                     print('[icfg_Reentrancy in] contract: {} . function: {} | {}'.format(function.contract.name, function.name, function.source_mapping_str))
-                '''
-                为了把当前的function的endnode的回调用处的那条路径再补上
-                '''
-                if endnodeMapBackSons:
-                    for endnode in function.ENDnodes:
-                        endnode.set_backIcfgSons = endnodeMapBackSons[endnode]
+
+
+
     def getAllEthNode_AllTaintNode(self):
         ethNodeList = []
         taintNodeList = []

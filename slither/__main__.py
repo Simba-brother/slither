@@ -586,9 +586,12 @@ def main_impl(all_detector_classes, all_printer_classes):
                 (results, number_contracts) = process_files(filenames, args, detector_classes, printer_classes)
             else:
                 for filename in filenames:
-                    (results_tmp, number_contracts_tmp) = process(filename, args, detector_classes, printer_classes)
-                    number_contracts += number_contracts_tmp
-                    results += results_tmp
+                    try:
+                        (results_tmp, number_contracts_tmp) = process(filename, args, detector_classes, printer_classes)
+                        number_contracts += number_contracts_tmp
+                        results += results_tmp
+                    except SlitherException as se:
+                        continue
 
         else:
             raise Exception("Unrecognised file/dir path: '#{filename}'".format(filename=filename))

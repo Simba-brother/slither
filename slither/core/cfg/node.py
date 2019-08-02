@@ -61,7 +61,7 @@ class NodeType:
 
     # Only modifier node
     PLACEHOLDER = 0x40
-
+    DUMMY = 0X41
 
 #    @staticmethod
     def str(t):
@@ -122,6 +122,8 @@ class Node(SourceMapping, ChildFunction):
 
 
     """
+
+
     def __init__(self, node_type, node_id):
         super(Node, self).__init__()
         self._node_type = node_type
@@ -503,7 +505,8 @@ class Node(SourceMapping, ChildFunction):
         """
         self._fathers = fathers
 
-
+    def set_icfgFather(self, fatherList):
+        self._icfgFathers = fatherList
     '''
     属性方法，get各种爸爸们
     '''

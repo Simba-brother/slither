@@ -20,6 +20,7 @@ class MyGraph(object):
         is_in_stack[1] = True  # 设置起点已入栈，true表示在栈中，false表示不在
         c_position = 1
         while len(node_stack) != 0:
+            #print('ma')
             top_element = node_stack[-1]
 
             if top_element == end:

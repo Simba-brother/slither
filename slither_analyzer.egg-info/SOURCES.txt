@@ -85,6 +85,7 @@ slither/detectors/all_detectors.py
 slither/detectors/ICFG_Reentrancy/ICFGreentrancy.py
 slither/detectors/ICFG_Reentrancy/__init__.py
 slither/detectors/ICFG_Reentrancy/smallUtils.py
+slither/detectors/ICFG_Reentrancy/testDFS.py
 slither/detectors/ICFG_Reentrancy/icfg/ICFG.py
 slither/detectors/ICFG_Reentrancy/icfg/__init__.py
 slither/detectors/attributes/__init__.py
@@ -100,6 +101,8 @@ slither/detectors/callGraph_cfg_Reentrancy/getAallPaths.py
 slither/detectors/callGraph_cfg_Reentrancy/tempTest.py
 slither/detectors/controlflowReentrancy/__init__.py
 slither/detectors/controlflowReentrancy/specificReen.py
+slither/detectors/effectIcfgReentrancy/EffectIcfgReentrancy.py
+slither/detectors/effectIcfgReentrancy/__init__.py
 slither/detectors/erc/__init__.py
 slither/detectors/erc/incorrect_erc20_interface.py
 slither/detectors/erc/incorrect_erc721_interface.py

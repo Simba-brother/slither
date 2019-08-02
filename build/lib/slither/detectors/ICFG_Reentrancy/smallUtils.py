@@ -34,3 +34,24 @@ def link_icfgNodes(n1, n2):
 def link_backIcfgNodes(n1, n2):
     n1.add_backIcfgSon(n2)
     n2.add_backIcfgFather(n1)
+
+def getadjMatrix(startToEndVertexList):
+    vertexNum = len(startToEndVertexList)
+    adjMatrix = [[0] * vertexNum for i in range(vertexNum)]
+    for node in startToEndVertexList:
+        for son in node.sons:
+            adjMatrix[startToEndVertexList.index(node)][startToEndVertexList.index(son)] = 1
+    return adjMatrix
+
+def getICFGadjMatrix(startToEndVertexList):
+    vertexNum = len(startToEndVertexList)
+    adjMatrix = [[0] * vertexNum for i in range(vertexNum)]
+    count = 3
+    for node in startToEndVertexList:
+        for son in node.sons:
+            adjMatrix[startToEndVertexList.index(node)][startToEndVertexList.index(son)] = 1
+        for son in node.icfgSons:
+            adjMatrix[startToEndVertexList.index(node)][startToEndVertexList.index(son)] = count
+            adjMatrix[startToEndVertexList.index(son)][startToEndVertexList.index(node)] = count-1
+            count += 2
+    return adjMatrix
