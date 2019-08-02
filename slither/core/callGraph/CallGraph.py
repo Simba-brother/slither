@@ -8,10 +8,15 @@ from slither.slithir.variables.constant import Constant
 
 
 def node_taint(node):
+    if node.internal_calls:
+        for internalCall in node.internal_calls:
+            if isinstance(internalCall, Function):
+                node.callee.append(internalCall)
     if node.high_level_calls or node.low_level_calls:
         for highLevelCall in node.high_level_calls:
             contract, functionOrVariable = highLevelCall
             if isinstance(functionOrVariable, Function):
+                node.callee.append(functionOrVariable)
                 for ir in node.irs:
                     if hasattr(ir, 'destination'):
                         taintflag = is_tainted(ir.destination, node.function.contract)
@@ -137,7 +142,7 @@ class CallGraph:
         for internal_call in functionNode.function.internal_calls:   # 拿到这个node的internal calls
             self._process_internal_call(functionNode, internal_call)
 
-        for external_call in functionNode.function.high_level_calls:    # 拿到这个node的internal calls
+        for external_call in functionNode.function.high_level_calls:    # 拿到这个node的external calls
             self._process_external_call(functionNode, external_call)
 
     def _process_internal_call(self, functionNode, internal_call):

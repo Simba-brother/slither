@@ -128,7 +128,8 @@ class Node(SourceMapping, ChildFunction):
         super(Node, self).__init__()
         self._node_type = node_type
 
-        # TODO: rename to explicit CFG 
+        # TODO: rename to explicit CFG
+        self.callee = []
         self._sons = []
         self._fathers = []
         self._icfgSons = []

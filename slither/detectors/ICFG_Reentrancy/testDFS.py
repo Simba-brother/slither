@@ -88,10 +88,10 @@ class MyDeepGraph:
 #     print(paths)
 # test()
 
-
+#
 # def temp():
+#     c = 'aaa'
 #     a = [1]
-#     c = []
-#     a.extend(c)
-#     print(a)
+#
+#     print(isinstance(c, list))
 # temp()

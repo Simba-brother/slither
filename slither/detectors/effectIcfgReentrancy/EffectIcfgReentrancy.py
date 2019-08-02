@@ -17,7 +17,10 @@ from slither.detectors.ICFG_Reentrancy.smallUtils import (getadjMatrix, getICFGa
 from slither.detectors.ICFG_Reentrancy.testDFS import MyDeepGraph
 
 def callerVisibilityHavePublic(function, callGraph):
+
     functionNode = callGraph.function_Map_node.get(function)
+    if functionNode is None:
+        return False
     for father in functionNode.fathers:
         if father.function.visibility == 'public':
             return True
@@ -206,15 +209,45 @@ class EffectIcfgReentrancy(AbstractDetector):
                         cfgAllPath_Node = allPaths_intToNode(cfgAllPath, cfgEntryNodeTotaint)
                         corePath = []
                         for path in cfgAllPath_Node:
-                            if any(cfgNode in careEthNode for cfgNode in path):
+                            if any(cfgNode in careEthNode for cfgNode in path[0:len(path)-1]):
                                 corePath.append(path)
                         if corePath:
+                            ###################################################
 
+                            ########################################
+                            for path in corePath[:]:
+                                for callee in path[-1].callee:
+                                    calleefunctionNode = callGraph.function_Map_node.get(callee)
+                                    for callGraphToTaintPath in callGraphToTaintAllPath_Node:
+                                        if calleefunctionNode == callGraphToTaintPath[1]:
+                                            afterCalleeList = [functionNode.function.full_name for functionNode in callGraphToTaintPath[1:]]
+                                            afterCalleeList.insert(0, 'taint')
+                                            path.append(afterCalleeList)
+
+                            for tempP in corePath[:]:
+                                for tempNode in tempP:
+                                    if tempNode in list(careEthNode):
+                                        for callee in tempNode.callee:
+                                            calleefunctionNode = callGraph.function_Map_node.get(callee)
+                                            for callGraphToEthPath in callGraphToEthAllPath_Node:
+                                                if calleefunctionNode == callGraphToEthPath[1]:
+                                                    afterCalleeList = [functionNode.function.full_name for functionNode in callGraphToEthPath[1:]]
+                                                    afterCalleeList.insert(0, 'eth')
+                                                    tempP.append(afterCalleeList)
+                            ##########################################
                             human_corePath = []
                             for path in corePath:
+                                ##############################################
                                 tempPath = []
-                                for cfgNode in path:
+                                needindex = len(path)
+                                for i in range(len(path)):
+                                    if isinstance(path[i], list):
+                                        needindex = i
+                                        break
+                                #########################
+                                for cfgNode in path[0:needindex]:
                                     tempPath.append(str(cfgNode.expression))
+                                tempPath.append(path[needindex:])
                                 human_corePath.append(tempPath)
                             advanceUpdateFlag = False  # dm.advancedUpdateEth(function)
                             privateVisibility = dm.privateVisibility(function)
