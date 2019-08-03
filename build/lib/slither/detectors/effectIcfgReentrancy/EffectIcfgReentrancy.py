@@ -119,7 +119,7 @@ class EffectIcfgReentrancy(AbstractDetector):
                                     everyNode.add_expression('entryPoint')
                                 tempPath.append(str(everyNode.expression))
                             human_cfgCandidateAllPath_Node.append(tempPath)
-                        advanceUpdateFlag = False  # dm.advancedUpdateEth(function)
+                        advanceUpdateFlag = dm.advancedUpdateEth(function)
                         privateVisibility = dm.privateVisibility(function)
                         havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                         haveDefenModifier = dm.haveDefenseModifier(function)

@@ -61,7 +61,7 @@ class NodeType:
 
     # Only modifier node
     PLACEHOLDER = 0x40
-    DUMMY = 0X41
+    DUMMY = 0X41  # 马明亮加的
 
 #    @staticmethod
     def str(t):

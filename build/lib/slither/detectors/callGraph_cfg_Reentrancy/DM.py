@@ -51,15 +51,14 @@ class DM:
                 care_RequireOrAssert_StateVariableRead = set()
                 state_variables_written = set()
                 for node in path:  # [start, end]
-                    if node.contains_require_or_assert:
+                    if node.contains_require_or_assert():
                         care_RequireOrAssert_StateVariableRead |= set(node.state_variables_read)
                     state_variables_written |= set(node.state_variables_written)
                     if node.type == NodeType.IF:
                         careifNodeStack.append(node)
                     if node.type == NodeType.ENDIF:
-                        if careifNodeStack:
-                            careifNodeStack.pop()
-                if careifNodeStack:
+                        careifNodeStack.pop()
+                if careifNodeStack:  # eth被包裹在if中
                     for careifNode in careifNodeStack:
                         care_if_StateVariablesRead |= set(careifNode.state_variables_read)
                     for stateVariableWritten in state_variables_written:
