@@ -10,6 +10,9 @@ from slither.core.variables.variable import Variable
 from slither.detectors.callGraph_cfg_Reentrancy.getAallPaths import getCfgAllPath
 from slither.core.cfg.node import NodeType
 from slither.analyses.data_dependency.data_dependency import is_dependent
+from slither.detectors.ICFG_Reentrancy.smallUtils import defenseModifier
+from slither.detectors.ICFG_Reentrancy.smallUtils import getadjMatrix
+from slither.detectors.ICFG_Reentrancy.testDFS import MyDeepGraph
 
 
 def allPaths_intToNode(allPathsInt, startToEndNodes):
@@ -36,21 +39,26 @@ class DM:
             entryPointToethNode.extend(pilotProcessNodes)
             entryPointToethNode.append(ethNode)
 
-            allPaths = getCfgAllPath(entryPointToethNode)
+            adjMatrix = getadjMatrix(entryPointToethNode)
+            mydeepGraph = MyDeepGraph(len(entryPointToethNode))
+            mydeepGraph.setadjMetrix(adjMatrix)
+            allPaths = mydeepGraph.getPathofTwoNode(0, len(entryPointToethNode) - 1)
             allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
+
             for path in allPaths_Node:
                 careifNodeStack = []
                 care_if_StateVariablesRead = set()
                 care_RequireOrAssert_StateVariableRead = set()
                 state_variables_written = set()
-                for node in reversed(path):  # [start, end]
+                for node in path:  # [start, end]
                     if node.contains_require_or_assert:
                         care_RequireOrAssert_StateVariableRead |= set(node.state_variables_read)
                     state_variables_written |= set(node.state_variables_written)
                     if node.type == NodeType.IF:
                         careifNodeStack.append(node)
                     if node.type == NodeType.ENDIF:
-                        careifNodeStack.pop()
+                        if careifNodeStack:
+                            careifNodeStack.pop()
                 if careifNodeStack:
                     for careifNode in careifNodeStack:
                         care_if_StateVariablesRead |= set(careifNode.state_variables_read)
@@ -71,6 +79,12 @@ class DM:
 
     def privateVisibility(self, function):
         if function.visibility == 'private':
+            return True
+        return False
+
+    def haveDefenseModifier(self, function):
+        defenseModifiers = defenseModifier()
+        if any(modifier.name in defenseModifiers for modifier in function.modifiers):
             return True
         return False
 

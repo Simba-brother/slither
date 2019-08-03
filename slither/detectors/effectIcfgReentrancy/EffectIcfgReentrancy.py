@@ -15,16 +15,17 @@ from slither.detectors.callGraph_cfg_Reentrancy.DM import allPaths_intToNode
 from slither.core.callGraph.CallGraph import CallGraph
 from slither.detectors.ICFG_Reentrancy.smallUtils import (getadjMatrix, getICFGadjMatrix)
 from slither.detectors.ICFG_Reentrancy.testDFS import MyDeepGraph
+from slither.detectors.ICFG_Reentrancy.smallUtils import defenseModifier
 
-def callerVisibilityHavePublic(function, callGraph):
+def callerVisibilityHavePublic(function, callGraph, dm):
 
     functionNode = callGraph.function_Map_node.get(function)
     if functionNode is None:
         return False
     for father in functionNode.fathers:
-        if father.function.visibility == 'public':
+        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False:
             return True
-        if callerVisibilityHavePublic(father, callGraph):
+        if callerVisibilityHavePublic(father, callGraph, dm):
             return True
     return False
 
@@ -120,19 +121,22 @@ class EffectIcfgReentrancy(AbstractDetector):
                             human_cfgCandidateAllPath_Node.append(tempPath)
                         advanceUpdateFlag = False  # dm.advancedUpdateEth(function)
                         privateVisibility = dm.privateVisibility(function)
-                        havePublicCaller = callerVisibilityHavePublic(function, callGraph)
-                        if privateVisibility is True:
+                        havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
+                        haveDefenModifier = dm.haveDefenseModifier(function)
+                        if privateVisibility is True or haveDefenModifier is True:
+                            accessPermision = True
                             if havePublicCaller is True:
                                 reentrancyFlag = True
-                                print('\t\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
-                                    function.contract.name, function.full_name, privateVisibility, havePublicCaller, advanceUpdateFlag))
+                                print('\t\tcontract: {} | function: {} | accessPermision: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
+                                    function.contract.name, function.full_name, accessPermision, havePublicCaller, advanceUpdateFlag))
                                 for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
                                     print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                         else:
+                            accessPermision = False
                             reentrancyFlag = True
                             print(
-                                '\t\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
-                                    function.contract.name, function.full_name, privateVisibility, advanceUpdateFlag))
+                                '\t\tcontract: {} | function: {} | accessPermision: {} | 锁/钱提前更新：{}'.format(
+                                    function.contract.name, function.full_name, accessPermision, advanceUpdateFlag))
                             for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
                                 print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                 if reentrancyFlag is True:
@@ -149,6 +153,15 @@ class EffectIcfgReentrancy(AbstractDetector):
                     callGraphToEthAllPath_Node = []
                     print('\t\tcfg分析安全，所以开始ICFG的分析'.format(function.full_name))
                     currentFunctionNode = callGraph.function_Map_node.get(function)
+
+                    '''
+                    把钱更新的那些个ethFunction剔除掉
+                    '''
+                    for ethFunctionNode in callGraph.ethFunctionNodes[:]:
+                        if dm.advancedUpdateEth(ethFunctionNode.function):
+                            callGraph.ethFunctionNodes.remove(ethFunctionNode)
+
+
                     for taintFunctionNode in callGraph.taintFunctionNodes:
                         functionNode_to_taintFunctionNode = []
                         functionNode_to_taintFunctionNode.append(currentFunctionNode)
@@ -251,21 +264,25 @@ class EffectIcfgReentrancy(AbstractDetector):
                                 human_corePath.append(tempPath)
                             advanceUpdateFlag = False  # dm.advancedUpdateEth(function)
                             privateVisibility = dm.privateVisibility(function)
-                            havePublicCaller = callerVisibilityHavePublic(function, callGraph)
-                            if privateVisibility is True:
+                            haveDefenModifier = dm.haveDefenseModifier(function)
+                            havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
+
+                            if privateVisibility is True or haveDefenModifier is True:
+                                accessPermision = True
                                 if havePublicCaller is True:
                                     reentrancyFlag = True
                                     print(
-                                        '\t\tcontract: {} | function: {} | private: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
-                                            function.contract.name, function.full_name, privateVisibility,
+                                        '\t\tcontract: {} | function: {} | accessPermision: {} | publicCaller: {} | 锁/钱提前更新：{}'.format(
+                                            function.contract.name, function.full_name, accessPermision,
                                             havePublicCaller, advanceUpdateFlag))
                                     for humanPath in human_corePath:
                                         print('\t\t\tpath：{}'.format(humanPath))
                             else:
+                                accessPermision = False
                                 reentrancyFlag = True
                                 print(
-                                    '\t\tcontract: {} | function: {} | private: {} | 锁/钱提前更新：{}'.format(
-                                        function.contract.name, function.full_name, privateVisibility,
+                                    '\t\tcontract: {} | function: {} | accessPermision: {} | 锁/钱提前更新：{}'.format(
+                                        function.contract.name, function.full_name, accessPermision,
                                         advanceUpdateFlag))
                                 for humanPath in human_corePath:
                                     print('\t\t\tpath：{}'.format(humanPath))

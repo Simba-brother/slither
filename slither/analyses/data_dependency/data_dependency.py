@@ -11,6 +11,7 @@ from slither.slithir.variables import (Constant, LocalIRVariable,
                                        TemporaryVariableSSA, TupleVariableSSA)
 from slither.core.solidity_types.type import Type
 from slither.core.variables.local_variable import LocalVariable
+from slither.detectors.ICFG_Reentrancy.smallUtils import defenseModifier
 
 ###################################################################################
 ###################################################################################
@@ -196,6 +197,9 @@ def compute_dependency_contract(contract, slither): # slither.context['DATA_DEPE
         propagate_function(contract, function, KEY_SSA_UNPROTECTED, KEY_NON_SSA_UNPROTECTED)
 
         if function.visibility in ['public', 'external']:
+            defenseModifiers = defenseModifier()        # 含有可疑modifier的public function parameters不作为taint源头
+            if any(modifier.name in defenseModifiers for modifier in function.modifiers):
+                continue
             [slither.context[KEY_INPUT].add(p) for p in function.parameters]
             [slither.context[KEY_INPUT_SSA].add(p) for p in function.parameters_ssa]
 

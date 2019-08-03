@@ -55,3 +55,7 @@ def getICFGadjMatrix(startToEndVertexList):
             adjMatrix[startToEndVertexList.index(son)][startToEndVertexList.index(node)] = count-1
             count += 2
     return adjMatrix
+
+def defenseModifier():
+    defenseModifierList = ['onlyOwner', 'ownerOnly', 'isAnOwner', 'onlyPartner', 'noFromContract', 'nonReentrant', 'noReentrancy', 'isYHT', 'onlyHuman', 'onlyAdmin', 'onlyPlayer', 'isWhitelisted', 'notContract', 'isHuman', 'noFromContract', 'onlyOwnerOrPartner', 'reentrancy', 'onlyManager', 'onlywhitelisted']
+    return defenseModifierList

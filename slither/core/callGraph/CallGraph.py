@@ -107,6 +107,7 @@ class CallGraph:
                     break
             for node in function.nodes:
                 if self._can_send_eth(node.irs):
+                    function.ethNodes.append(node)
                     ethFlag = True
                     break
             functionNode = FunctionNode(self._counter_FunctionNodes, function)
