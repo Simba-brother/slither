@@ -79,7 +79,8 @@ class EffectIcfgReentrancy(AbstractDetector):
                 print('\tTo analyze：{}.{}'.format(function.contract.name, function.full_name))
                 dm = DM(function)   # 声明dm防御对象
                 reentrancyFlag = False
-
+                # for node in function.nodes:
+                #     self._node_taint(node)
                 function_ethNodeList = []   # 存储本函数体内的eth
                 functon_taintNodeList = []  # 存储本函数体内的taint
                 for node in function.nodes:
@@ -97,7 +98,6 @@ class EffectIcfgReentrancy(AbstractDetector):
                     cfgEntryNodeTotaint.extend(list(set(function.nodes) - set([function.entry_point, function_taintNode])))
                     cfgEntryNodeTotaint.append(function_taintNode)
 
-                    # cfgAllPath = getCfgAllPath(cfgEntryNodeTotaint)
                     adjMatrix = getadjMatrix(cfgEntryNodeTotaint)
                     mydeepGraph = MyDeepGraph(len(cfgEntryNodeTotaint))
                     mydeepGraph.setadjMetrix(adjMatrix)
@@ -331,11 +331,13 @@ class EffectIcfgReentrancy(AbstractDetector):
                         if hasattr(ir, 'destination'):
                             taintflag = is_tainted(ir.destination, node.function.contract)
                             if taintflag is True:
+                               # print(str(node.expression) + '\t' + str(taintflag))
                                 return True
         if node.low_level_calls:
             for ir in node.irs:
                 if hasattr(ir, 'destination'):
                     taintflag = is_tainted(ir.destination, node.function.contract)
                     if taintflag is True:
+                        # print(str(node.expression) + '\t' + str(taintflag))
                         return True
         return False

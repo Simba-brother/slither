@@ -57,7 +57,8 @@ class DM:
                     if node.type == NodeType.IF:
                         careifNodeStack.append(node)
                     if node.type == NodeType.ENDIF:
-                        careifNodeStack.pop()
+                        if careifNodeStack:
+                            careifNodeStack.pop()
                 if careifNodeStack:  # eth被包裹在if中
                     for careifNode in careifNodeStack:
                         care_if_StateVariablesRead |= set(careifNode.state_variables_read)
