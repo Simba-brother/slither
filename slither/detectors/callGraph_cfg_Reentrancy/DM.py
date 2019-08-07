@@ -9,10 +9,11 @@ from slither.slithir.operations import (HighLevelCall, LowLevelCall,
 from slither.core.variables.variable import Variable
 from slither.detectors.callGraph_cfg_Reentrancy.getAallPaths import getCfgAllPath
 from slither.core.cfg.node import NodeType
-from slither.analyses.data_dependency.data_dependency import is_dependent
+# from slither.analyses.data_dependency.data_dependency import is_dependent
 from slither.detectors.ICFG_Reentrancy.smallUtils import defenseModifier
 from slither.detectors.ICFG_Reentrancy.smallUtils import getadjMatrix
 from slither.detectors.ICFG_Reentrancy.testDFS import MyDeepGraph
+from slither.core.declarations import SolidityVariableComposed
 
 
 def allPaths_intToNode(allPathsInt, startToEndNodes):
@@ -26,10 +27,35 @@ def allPaths_intToNode(allPathsInt, startToEndNodes):
 
 
 class DM:
+
     def __init__(self, function):
         self.function = function
 
+    def requireMsgSender(self, function):
+        from slither.analyses.data_dependency.data_dependency import is_dependent
+        for modifier in function.modifiers:
+            for node in modifier.nodes:
+                if node.contains_require_or_assert():
+                    print(str(node.expression))
+                    solidity_var_read = node.solidity_variables_read
+                    if solidity_var_read:
+                        return any(v.name == 'msg.sender' for v in solidity_var_read)
+                    # for variable in node.variables_read:
+                    #     if variable.name == 'msg.sender':
+                    #     #if is_dependent(variable, SolidityVariableComposed('msg.sender'), function.contract):
+                    #         return True
+
+        variables_readInrequireOrAssert = function.reading_in_require_or_assert()
+        for variable in variables_readInrequireOrAssert:
+            # if is_dependent(variable, SolidityVariableComposed('msg.sender'), function.contract):
+            #     return True
+            if variable.name == 'msg.sender':
+                return True
+        return False
+
     def advancedUpdateEth(self, function):
+        from slither.analyses.data_dependency.data_dependency import is_dependent
+
         allNodes = function.nodes
         for ethNode in function.ethNodes:
 

@@ -23,7 +23,7 @@ def callerVisibilityHavePublic(function, callGraph, dm):
     if functionNode is None:
         return False
     for father in functionNode.fathers:
-        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False:
+        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False and dm.requireMsgSender(father.function) is False:
             return True
         if callerVisibilityHavePublic(father, callGraph, dm):
             return True
@@ -81,6 +81,9 @@ class EffectIcfgReentrancy(AbstractDetector):
                 reentrancyFlag = False
                 # for node in function.nodes:
                 #     self._node_taint(node)
+
+
+
                 function_ethNodeList = []   # 存储本函数体内的eth
                 functon_taintNodeList = []  # 存储本函数体内的taint
                 for node in function.nodes:
@@ -123,7 +126,8 @@ class EffectIcfgReentrancy(AbstractDetector):
                         privateVisibility = dm.privateVisibility(function)
                         havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                         haveDefenModifier = dm.haveDefenseModifier(function)
-                        if privateVisibility is True or haveDefenModifier is True:
+                        haveDefenRequire = dm.requireMsgSender(function)
+                        if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
                             accessPermision = True
                             if havePublicCaller is True:
                                 reentrancyFlag = True
@@ -161,6 +165,9 @@ class EffectIcfgReentrancy(AbstractDetector):
                         if dm.advancedUpdateEth(ethFunctionNode.function):
                             callGraph.ethFunctionNodes.remove(ethFunctionNode)
 
+                    # for taintFunctionNode in callGraph.taintFunctionNodes[:]:
+                    #     if dm.requireMsgSender(taintFunctionNode.function):
+                    #         callGraph.taintFunctionNodes.remove(taintFunctionNode)
 
                     for taintFunctionNode in callGraph.taintFunctionNodes:
                         functionNode_to_taintFunctionNode = []
@@ -266,8 +273,9 @@ class EffectIcfgReentrancy(AbstractDetector):
                             privateVisibility = dm.privateVisibility(function)
                             haveDefenModifier = dm.haveDefenseModifier(function)
                             havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
+                            haveDefenRequire = dm.requireMsgSender(function)
 
-                            if privateVisibility is True or haveDefenModifier is True:
+                            if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
                                 accessPermision = True
                                 if havePublicCaller is True:
                                     reentrancyFlag = True
@@ -317,21 +325,21 @@ class EffectIcfgReentrancy(AbstractDetector):
                 if ir.call_value:
                     # print(type(ir.call_value))  # <class 'slither.slithir.variables.constant.Constant'>
                     # print(str(ir.call_value))
-                    if isinstance(ir.call_value, Constant) and str(ir.call_value) == '0':
+                    if str(ir.call_value) == '0':  # isinstance(ir.call_value, Constant) and
                         return False
                     return True
         return False
 
     def _node_taint(self, node):
         if node.high_level_calls or node.low_level_calls:
-            for highLevelCall in  node.high_level_calls:
+            for highLevelCall in node.high_level_calls:
                 contract, functionOrVariable = highLevelCall
                 if isinstance(functionOrVariable, Function):
                     for ir in node.irs:
                         if hasattr(ir, 'destination'):
                             taintflag = is_tainted(ir.destination, node.function.contract)
                             if taintflag is True:
-                               # print(str(node.expression) + '\t' + str(taintflag))
+                                # print(str(node.expression) + '\t' + str(taintflag))
                                 return True
         if node.low_level_calls:
             for ir in node.irs:
