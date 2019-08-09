@@ -36,22 +36,34 @@ class DM:
         for modifier in function.modifiers:
             for node in modifier.nodes:
                 if node.contains_require_or_assert():
-                    print(str(node.expression))
                     solidity_var_read = node.solidity_variables_read
                     if solidity_var_read:
-                        return any(v.name == 'msg.sender' for v in solidity_var_read)
+                        for v in solidity_var_read:
+                            if v.name == 'msg.sender':
+                                return True
+                        #return any(v.name == 'msg.sender' for v in solidity_var_read)
                     # for variable in node.variables_read:
                     #     if variable.name == 'msg.sender':
                     #     #if is_dependent(variable, SolidityVariableComposed('msg.sender'), function.contract):
                     #         return True
 
-        variables_readInrequireOrAssert = function.reading_in_require_or_assert()
-        for variable in variables_readInrequireOrAssert:
-            # if is_dependent(variable, SolidityVariableComposed('msg.sender'), function.contract):
-            #     return True
-            if variable.name == 'msg.sender':
-                return True
+        for node in function.nodes:
+            if node.contains_require_or_assert():
+                solidity_var_read = node.solidity_variables_read
+                if solidity_var_read:
+                    for v in solidity_var_read:
+                        if v.name == 'msg.sender':
+                            return True
         return False
+                    #return any(v.name == 'msg.sender' for v in solidity_var_read)
+        # variables_readInrequireOrAssert = function.reading_in_require_or_assert()
+        # for variable in variables_readInrequireOrAssert:
+        #     # if is_dependent(variable, SolidityVariableComposed('msg.sender'), function.contract):
+        #     #     return True
+        #     if variable:
+        #         if variable.name == 'msg.sender':
+        #             return True
+        # return False
 
     def advancedUpdateEth(self, function):
         from slither.analyses.data_dependency.data_dependency import is_dependent

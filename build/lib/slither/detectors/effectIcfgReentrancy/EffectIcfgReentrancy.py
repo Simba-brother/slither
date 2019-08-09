@@ -23,7 +23,7 @@ def callerVisibilityHavePublic(function, callGraph, dm):
     if functionNode is None:
         return False
     for father in functionNode.fathers:
-        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False and dm.requireMsgSender(father.function) is False:
+        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False and dm.requireMsgSender(father.function) is False and father.function.is_protected() is False:
             return True
         if callerVisibilityHavePublic(father, callGraph, dm):
             return True
@@ -127,7 +127,8 @@ class EffectIcfgReentrancy(AbstractDetector):
                         havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                         haveDefenModifier = dm.haveDefenseModifier(function)
                         haveDefenRequire = dm.requireMsgSender(function)
-                        if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
+
+                        if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True or function.is_protected() is True:
                             accessPermision = True
                             if havePublicCaller is True:
                                 reentrancyFlag = True
@@ -275,7 +276,7 @@ class EffectIcfgReentrancy(AbstractDetector):
                             havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                             haveDefenRequire = dm.requireMsgSender(function)
 
-                            if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
+                            if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True or function.is_protected() is True:
                                 accessPermision = True
                                 if havePublicCaller is True:
                                     reentrancyFlag = True
@@ -331,6 +332,7 @@ class EffectIcfgReentrancy(AbstractDetector):
         return False
 
     def _node_taint(self, node):
+
         if node.high_level_calls or node.low_level_calls:
             for highLevelCall in node.high_level_calls:
                 contract, functionOrVariable = highLevelCall

@@ -199,6 +199,12 @@ def compute_dependency_contract(contract, slither): # slither.context['DATA_DEPE
         propagate_function(contract, function, KEY_SSA_UNPROTECTED, KEY_NON_SSA_UNPROTECTED)
 
         if function.visibility in ['public', 'external']:
+            if function.is_constructor:
+                continue
+            if function.modifiers:
+                for modifier in function.modifiers:
+                    if modifier.is_protected():
+                        continue
             dm = DM(function)
             haveDefenRequire = dm.requireMsgSender(function)
             defenseModifiers = defenseModifier()        # 含有可疑modifier的public function parameters不作为taint源头
