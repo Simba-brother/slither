@@ -88,10 +88,14 @@ class DM:
                 care_if_StateVariablesRead = set()
                 care_RequireOrAssert_StateVariableRead = set()
                 state_variables_written = set()
-                for node in path:  # [start, end]
+                for node in path:  # [start, end]    # 直接转帐函数cfg上的路径节点
                     if node.contains_require_or_assert():
                         care_RequireOrAssert_StateVariableRead |= set(node.state_variables_read)
                     state_variables_written |= set(node.state_variables_written)
+                    if node.type == NodeType.IF:
+                        for son in node.sons:
+                            if son.type == NodeType.THROW or son.type == NodeType.RETURN:
+                                careifNodeStack.append(node)
                     if node.type == NodeType.IF:
                         careifNodeStack.append(node)
                     if node.type == NodeType.ENDIF:
@@ -114,6 +118,34 @@ class DM:
                                 return True
 
         return False
+
+    def advancedUpdateEth_2(self, function):
+        from slither.analyses.data_dependency.data_dependency import is_dependent
+        allNodes = function.nodes
+        for ethNode in function.ethNodes:
+            entryPointToethNode = []
+            entryPointToethNode.append(function.entry_point)
+            pilotProcessNodes = list(set(allNodes) - set([function.entry_point, ethNode]))
+            entryPointToethNode.extend(pilotProcessNodes)
+            entryPointToethNode.append(ethNode)
+
+            adjMatrix = getadjMatrix(entryPointToethNode)
+            mydeepGraph = MyDeepGraph(len(entryPointToethNode))
+            mydeepGraph.setadjMetrix(adjMatrix)
+            allPaths = mydeepGraph.getPathofTwoNode(0, len(entryPointToethNode) - 1)
+            allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
+
+            for path in allPaths_Node:
+                for ir in path[-1].irs:
+                    if isinstance(ir, (HighLevelCall, LowLevelCall, Transfer, Send)):
+                        if ir.call_value:
+                            for node in path[0:len(path)-1]:
+                                for stateVariableWritten in node.state_variables_written:
+                                    if is_dependent(ir.call_value, stateVariableWritten, function.contract):
+                                        return True
+                                    # elif is_dependent(stateVariableWritten, ir.call_value, function.contract):
+                                    #     return True
+            return False
 
     def privateVisibility(self, function):
         if function.visibility == 'private':
