@@ -54,6 +54,8 @@ class DM:
                     for v in solidity_var_read:
                         if v.name == 'msg.sender':
                             return True
+        # if function.is_protected():
+        #     return True
         return False
                     #return any(v.name == 'msg.sender' for v in solidity_var_read)
         # variables_readInrequireOrAssert = function.reading_in_require_or_assert()
@@ -70,7 +72,6 @@ class DM:
 
         allNodes = function.nodes
         for ethNode in function.ethNodes:
-
             entryPointToethNode = []
             entryPointToethNode.append(function.entry_point)
             pilotProcessNodes = list(set(allNodes) - set([function.entry_point, ethNode]))
@@ -83,7 +84,8 @@ class DM:
             allPaths = mydeepGraph.getPathofTwoNode(0, len(entryPointToethNode) - 1)
             allPaths_Node = allPaths_intToNode(allPaths, entryPointToethNode)
 
-            for path in allPaths_Node:
+            for path in allPaths_Node[:]:
+
                 careifNodeStack = []
                 care_if_StateVariablesRead = set()
                 care_RequireOrAssert_StateVariableRead = set()
@@ -109,6 +111,7 @@ class DM:
                             result = is_dependent(stateVariableWritten, careStateVariableRead, function.contract)
                             if result == True:
                                 return True
+                                # allPaths_Node.remove(path)
 
                 else:  # 如果 转账语句不在if block中
                     for stateVariableWritten in state_variables_written:
@@ -116,7 +119,10 @@ class DM:
                             result = is_dependent(stateVariableWritten, careStateVariableRead, function.contract)
                             if result == True:
                                 return True
-
+                                #allPaths_Node.remove(path)
+                                #return False
+            # if allPaths_Node:
+            #     return False
         return False
 
     def advancedUpdateEth_2(self, function):

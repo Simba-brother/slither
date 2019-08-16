@@ -23,7 +23,7 @@ def callerVisibilityHavePublic(function, callGraph, dm):
     if functionNode is None:
         return False
     for father in functionNode.fathers:
-        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False and dm.requireMsgSender(father.function) is False and father.function.is_protected() is False:
+        if father.function.visibility == 'public' and dm.haveDefenseModifier(father.function) is False and dm.requireMsgSender(father.function) is False:
             return True
         if callerVisibilityHavePublic(father, callGraph, dm):
             return True
@@ -79,6 +79,7 @@ class EffectIcfgReentrancy(AbstractDetector):
                 print('\tTo analyze：{}.{}'.format(function.contract.name, function.full_name))
                 dm = DM(function)   # 声明dm防御对象
                 reentrancyFlag = False
+
                 # for node in function.nodes:
                 #     self._node_taint(node)
 
@@ -114,6 +115,7 @@ class EffectIcfgReentrancy(AbstractDetector):
 
                     if cfgCandidateAllPath_Node:   # 证明cfg本身就找到Reentrancy了，准备humanlook, 注意reversed, DM
 
+
                         human_cfgCandidateAllPath_Node = []
                         for path in cfgCandidateAllPath_Node:
                             tempPath = []
@@ -127,22 +129,27 @@ class EffectIcfgReentrancy(AbstractDetector):
                         havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                         haveDefenModifier = dm.haveDefenseModifier(function)
                         haveDefenRequire = dm.requireMsgSender(function)
-                        ethAdvanceUpdateFlag = dm.advancedUpdateEth_2(function)
+                        #ethAdvanceUpdateFlag = dm.advancedUpdateEth_2(function)
 
-                        if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True or function.is_protected() is True:
-                            accessPermision = True
+                        if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
+                            # print('privateVisibility: ', privateVisibility)
+                            # print('haveDefenModifier: ', haveDefenModifier)
+                            # print('haveDefenRequire: ', haveDefenRequire)
+                            # print('function.is_protected() ', function.is_protected())
+                            # accessPermision = True
+                            # havePublicCaller = True
                             if havePublicCaller is True:
                                 reentrancyFlag = True
-                                print('\t\tcontract: {} | function: {} | accessPermision: {} | publicCaller: {} | 锁: {} | 钱提前更新：{}'.format(
-                                    function.contract.name, function.full_name, accessPermision, havePublicCaller, advanceUpdateFlag, ethAdvanceUpdateFlag))
+                                print('\t\tcontract: {} | function: {} | accessPermision: {} | publicCaller: {} | 锁: {} '.format(
+                                    function.contract.name, function.full_name, accessPermision, havePublicCaller, advanceUpdateFlag))
                                 for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
                                     print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                         else:
                             accessPermision = False
                             reentrancyFlag = True
                             print(
-                                '\t\tcontract: {} | function: {} | accessPermision: {} | 锁: {} | 钱提前更新：{}'.format(
-                                    function.contract.name, function.full_name, accessPermision, advanceUpdateFlag, ethAdvanceUpdateFlag))
+                                '\t\tcontract: {} | function: {} | accessPermision: {} | 锁: {}'.format(
+                                    function.contract.name, function.full_name, accessPermision, advanceUpdateFlag))
                             for human_cfgCandidatePath_Node in human_cfgCandidateAllPath_Node:
                                 print('\t\t\tpath: {}'.format(human_cfgCandidatePath_Node))
                 if reentrancyFlag is True:
@@ -164,7 +171,7 @@ class EffectIcfgReentrancy(AbstractDetector):
                     把钱更新的那些个ethFunction剔除掉
                     '''
                     for ethFunctionNode in callGraph.ethFunctionNodes[:]:
-                        if dm.advancedUpdateEth(ethFunctionNode.function) or dm.advancedUpdateEth_2(ethFunctionNode.function):
+                        if dm.advancedUpdateEth(ethFunctionNode.function):# or dm.advancedUpdateEth_2(ethFunctionNode.function):
                             callGraph.ethFunctionNodes.remove(ethFunctionNode)
 
                     # for taintFunctionNode in callGraph.taintFunctionNodes[:]:
