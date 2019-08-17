@@ -284,7 +284,7 @@ class EffectIcfgReentrancy(AbstractDetector):
                             havePublicCaller = callerVisibilityHavePublic(function, callGraph, dm)
                             haveDefenRequire = dm.requireMsgSender(function)
 
-                            if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True or function.is_protected() is True:
+                            if privateVisibility is True or haveDefenModifier is True or haveDefenRequire is True:
                                 accessPermision = True
                                 if havePublicCaller is True:
                                     reentrancyFlag = True
